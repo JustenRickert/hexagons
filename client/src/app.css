@@ -1,0 +1,11 @@
+/* #app { */
+/*   max-height: 100vh; */
+/* } */
+
+.left-menu {
+  position: fixed;
+  background-color: red;
+  margin: 1rem;
+  min-width: 20rem;
+  padding: 0.5rem;
+}
