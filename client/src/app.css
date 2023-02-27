@@ -9,3 +9,7 @@
   min-width: 20rem;
   padding: 0.5rem;
 }
+
+.player {
+  transition: transform 1s;
+}

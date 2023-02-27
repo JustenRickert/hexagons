@@ -1,42 +1,15 @@
-import { useState } from "preact/hooks";
 import "./app.css";
-import { makeAtom, useAtom } from "./game/state";
-import { Axial, Grid, Hex, HexGrid } from "./grid";
-import { ORIGIN } from "./grid/hex";
-import { SvgView } from "./grid/svg-view";
 
-// export interface Grid {
-//   hexes: Record<AxialId, Hex>;
-// }
-
-// const DEFAULT_HEXES: Record<AxialId, Hex> = {
-//   [`0,0`]: ORIGIN,
-//   ...ring(1, ORIGIN.pos).reduce((neighbors, a) => {
-//     const h = hex({
-//       pos: a,
-//       color: sample(["red", "yellow", "green", "orange"]),
-//     });
-//     return {
-//       ...neighbors,
-//       [h.id]: h,
-//     };
-//   }, {} as Record<AxialId, Hex>),
-//   ...ring(2, ORIGIN.pos).reduce((neighbors, a) => {
-//     const h = hex({
-//       pos: a,
-//       color: "gray",
-//     });
-//     return {
-//       ...neighbors,
-//       [h.id]: h,
-//     };
-//   }, {} as Record<AxialId, Hex>),
-// };
-
-// const DEFAULT_GRID = {
-//   ids: keys(DEFAULT_HEXES),
-//   hexes: DEFAULT_HEXES,
-// };
+import { aperture } from "ramda";
+import { memo } from "preact/compat";
+import { useState } from "preact/hooks";
+import { Board, Player } from "./game";
+import { usePlayer } from "./game/player";
+import { useAtom, useAtomEffects } from "./game/state";
+import { Axial, Hex, Radian } from "./grid";
+import { HexSvg } from "./grid/hex-svg";
+import { ViewSvg } from "./grid/view-svg";
+import ChessLikeGame from "./chesslike";
 
 function timeFn<F extends (a: any) => any>(name: string, fn: F) {
   return (...args: Parameters<F>) => {
@@ -58,10 +31,6 @@ function LeftMenu({ hex }: { hex: Hex.T }) {
 
 function MenuMode() {}
 
-const defaultGrid = Grid.randomHexGrid({
-  size: 50,
-});
-
 // let i = 0;
 // const start = performance.now();
 // Grid.traverse(defaultGrid, {
@@ -74,22 +43,70 @@ const defaultGrid = Grid.randomHexGrid({
 // });
 // console.log("took %sms", performance.now() - start);
 
-interface Player {
-  hexId: Hex.Id;
-}
-
-const player$ = makeAtom<Player>("player", {
-  hexId: ORIGIN.id,
+export const HexGrid = memo(function HexGrid({
+  onClickHex,
+}: {
+  onClickHex: (hex: Hex.T) => void;
+}) {
+  const [board] = useAtom(Board.atom);
+  const player = usePlayer();
+  return (
+    <>
+      <g class="hexes">
+        {Object.values(board.grid.hexes).map((hex) => (
+          <HexSvg
+            key={hex.id}
+            hex={hex}
+            onClick={onClickHex}
+            onRightClick={player.move}
+          />
+        ))}
+      </g>
+    </>
+  );
 });
 
-function Player({ grid }: { grid: Grid.T }) {
-  const [player] = useAtom(player$);
-  const hex = grid.hexes[player.hexId];
+function LinePathSvg({ path }: { path: Hex.T[] }) {
+  console.log(path);
+  return (
+    <g class="line-path">
+      {aperture(2, path).map(([from, to]) => {
+        const { x: x1, y: y1 } = Axial.cartesian(from.pos);
+        const { x: x2, y: y2 } = Axial.cartesian(to.pos);
+        return (
+          <line
+            key={`${from.id},${to.id}`}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke="black"
+            strokeWidth={8}
+            strokeLinecap="round"
+          />
+        );
+      })}
+    </g>
+  );
+}
+
+function PlayerGrid() {
+  const {
+    value: { rot, hexId, movement },
+  } = usePlayer();
+  const [board] = useAtom(Board.atom);
+  const hex = board.grid.hexes[hexId];
 
   return (
-    <g class="player" transform={Axial.translatef(hex.pos)}>
-      <polygon points="-25,25 25,25 0,-25" />;
-    </g>
+    <>
+      <g
+        class="player"
+        transform={[Axial.translatef(hex.pos), Radian.rotatef(rot)].join(" ")}
+      >
+        <polygon points="-25,25 25,25 0,-25" />;
+      </g>
+      {movement && <LinePathSvg path={[movement.start, ...movement.moves]} />}
+    </>
   );
 }
 
@@ -102,35 +119,25 @@ function Player({ grid }: { grid: Grid.T }) {
 
 function GameMode() {
   const [selectedHex, setSelectedHex] = useState<null | Hex.T>(null);
-  const [grid, setGrid] = useState<Grid.T>(defaultGrid);
-  const [, setPlayer] = useAtom(player$);
 
-  const rightClickHex = (hex: Hex.T) => {
-    setPlayer((state) => ({
-      ...state,
-      hexId: hex.id,
-    }));
-  };
+  useAtomEffects(Player.atom);
 
   return (
     <div>
       {selectedHex && <LeftMenu hex={selectedHex} />}
-      <SvgView>
-        <HexGrid
-          hexes={grid.hexes}
-          onClickHex={setSelectedHex}
-          onRightClickHex={rightClickHex}
-        />
-        <Player grid={grid} />
-      </SvgView>
+      <ViewSvg>
+        <HexGrid onClickHex={setSelectedHex} />
+        <PlayerGrid />
+      </ViewSvg>
     </div>
   );
 }
+// <GameMode />
 
 export function App() {
   return (
     <div>
-      <GameMode />
+      <ChessLikeGame />
     </div>
   );
 }

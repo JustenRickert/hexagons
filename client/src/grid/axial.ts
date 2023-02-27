@@ -20,6 +20,27 @@ export function cartesian({ q, r }: T) {
   };
 }
 
+function minus(a1: T, a2: T): T {
+  return {
+    q: a1.q - a2.q,
+    r: a1.r - a2.r,
+  };
+}
+
+export function angle(a1: T, a2: T) {
+  const c1 = cartesian(a1);
+  const c2 = cartesian(a2);
+  const dy = c2.y - c1.y;
+  const dx = c2.x - c1.x;
+  console.log({
+    dx,
+    dy,
+    atan2: Math.atan2(dy, dx),
+    angle: (180 / Math.PI) * Math.atan2(dy, dx),
+  });
+  return (180 / Math.PI) * Math.atan2(dy, dx) + 90;
+}
+
 export function translatef(a: T) {
   const { x, y } = cartesian(a);
   return `translate(${x}, ${y})`;

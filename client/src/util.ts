@@ -47,3 +47,11 @@ export function range(from: number, to: number) {
 }
 
 export const keys: <O extends {}>(o: O) => (keyof O)[] = Object.keys;
+
+export function thru<T>(t: T, ...xfs: ((t: T) => T)[]) {
+  return xfs.reduce((t, xf) => xf(t), t);
+}
+
+export function pipeM<T>(...xfs: ((t: T) => T)[]) {
+  return (t: T) => xfs.reduce((t, xf) => xf(t), t);
+}

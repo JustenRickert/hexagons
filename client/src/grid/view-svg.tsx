@@ -1,4 +1,6 @@
-import { MutableRef, useEffect, useRef, useState } from "preact/hooks";
+import { Ref, RefObject } from "preact";
+import { memo } from "preact/compat";
+import { useEffect, useState } from "preact/hooks";
 import { JSX } from "preact/jsx-runtime";
 import { assert, mouseEvents } from "../util";
 
@@ -8,10 +10,12 @@ const VIEW_HEIGHT = 2000;
  * TODO Need to preserve drag offset after window resize events
  */
 function useScreenPanning(
-  view: MutableRef<SVGSVGElement | null>,
-  screen: { width: number; height: number; dpi: number }
+  view: RefObject<SVGSVGElement>,
+  screen: { width: number; height: number; dpi: number },
+  { disabled }: { disabled: boolean }
 ) {
   useEffect(() => {
+    if (disabled) return;
     assert(view.current);
     let down = false;
     let start: [number, number] = [
@@ -51,7 +55,12 @@ function useScreenPanning(
   }, [screen]);
 }
 
-function useScreen(view: MutableRef<SVGSVGElement | null>) {
+function useScreen(
+  view: RefObject<SVGSVGElement>,
+  options: {
+    disabledPanning: boolean;
+  }
+) {
   const [state, setState] = useState(() => ({
     height: window.innerHeight,
     width: window.innerWidth,
@@ -75,22 +84,25 @@ function useScreen(view: MutableRef<SVGSVGElement | null>) {
     };
   }, []);
 
-  useScreenPanning(view, state);
+  useScreenPanning(view, state, { disabled: options.disabledPanning });
 
   return state;
 }
 
-function handleContextMenu(e: JSX.TargetedMouseEvent<SVGSVGElement>) {
+function disableContextMenu(e: JSX.TargetedMouseEvent<SVGSVGElement>) {
   e.preventDefault();
 }
 
-export function SvgView({
+export const ViewSvg = memo(function SvgView({
+  svgRef,
   children,
+  disabledPanning = false,
 }: {
+  svgRef: RefObject<SVGSVGElement>;
   children: JSX.Element | JSX.Element[];
+  disabledPanning?: boolean;
 }) {
-  const view = useRef<SVGSVGElement>(null);
-  const screen = useScreen(view);
+  const screen = useScreen(svgRef, { disabledPanning });
   const width = (screen.width / screen.height) * VIEW_HEIGHT;
   const viewBox = [
     (-1 / 2) * width,
@@ -100,12 +112,12 @@ export function SvgView({
   ].join(" ");
   return (
     <svg
-      onContextMenu={handleContextMenu}
-      ref={view}
+      onContextMenu={disableContextMenu}
+      ref={svgRef}
       viewBox={viewBox}
       xmlns="http://www.w3.org/2000/svg"
     >
       {children}
     </svg>
   );
-}
+});

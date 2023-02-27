@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "preact/hooks";
-import { assert, mouseEvents } from "../util";
+import { useCallback, useLayoutEffect, useRef } from "preact/hooks";
+import { assert } from "../util";
 import * as Axial from "./axial";
 import { T } from "./hex";
 
-function Hex({
+export function HexSvg({
   hex,
-  onClick,
-  onRightClick,
+  onClick = () => {},
+  onRightClick = () => {},
   showCoordinate = false,
 }: {
   hex: T;
-  onClick: (hex: T) => void;
-  onRightClick: (hex: T) => void;
+  onClick?: (hex: T) => void;
+  onRightClick?: (hex: T) => void;
   showCoordinate?: boolean;
 }) {
   const ref = useRef<SVGPolygonElement>(null);
@@ -74,6 +74,7 @@ function Hex({
   return (
     <g transform={Axial.translatef(hex.pos)}>
       <polygon
+        transform="scale(0.95)"
         onContextMenu={rightClick}
         ref={ref}
         // TODO Not sure yet if there are benefits to the above alternative way
@@ -91,30 +92,5 @@ function Hex({
         </>
       )}
     </g>
-  );
-}
-
-export function HexGrid({
-  hexes,
-  onClickHex,
-  onRightClickHex,
-}: {
-  onRightClickHex: (hex: T) => void;
-  onClickHex: (hex: T) => void;
-  hexes: Record<Axial.Id, T>;
-}) {
-  return (
-    <>
-      <g class="hexes">
-        {Object.values(hexes).map((hex) => (
-          <Hex
-            key={hex.id}
-            hex={hex}
-            onClick={onClickHex}
-            onRightClick={onRightClickHex}
-          />
-        ))}
-      </g>
-    </>
   );
 }

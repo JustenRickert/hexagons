@@ -1,9 +1,10 @@
-export * from "./hex-grid";
 import { assert, range, sample } from "../util";
 import * as Axial from "./axial";
 import * as Hex from "./hex";
+import { PriorityQueue } from "./priority";
+import * as Radian from "./radian";
 
-export { Axial, Hex };
+export { Axial, Hex, Radian };
 
 export namespace Grid {
   export interface T {
@@ -23,7 +24,7 @@ function gridRing(dist: number, hex: Hex.T, grid: Grid.T): Hex.T[] {
     .filter(Boolean);
 }
 
-// can probably by memoized
+// can probably by memoized ?
 function neighbors(hex: Hex.T, grid: Grid.T) {
   return gridRing(1, hex, grid);
 }
@@ -31,7 +32,10 @@ function neighbors(hex: Hex.T, grid: Grid.T) {
 function breadthFirst(
   grid: Grid.T,
   origin: Hex.T,
-  options: { tap: (hex: Hex.T) => void; while?: (hex: Hex.T) => boolean }
+  options: {
+    tap: (hex: Hex.T, extra: { neighbors: Hex.T[] }) => void;
+    while?: (hex: Hex.T) => boolean;
+  }
 ) {
   const frontier: Hex.T[] = [origin];
   const reached: Record<Axial.Id, Hex.T> = {};
@@ -40,9 +44,12 @@ function breadthFirst(
     let current = frontier.pop();
     if (!current) return;
     if (options.while && !options.while(current)) return;
-    options.tap(current);
+    const ns = neighbors(current, grid);
+    options.tap(current, {
+      neighbors: ns,
+    });
     reached[current.id] = current;
-    for (const n of neighbors(current, grid)) {
+    for (const n of ns) {
       if (!reached[n.id]) frontier.unshift(n);
     }
   }
@@ -51,12 +58,12 @@ function breadthFirst(
 function traverse(
   grid: Grid.T,
   options: {
-    tap?: (hex: Hex.T) => void;
+    tap?: (hex: Hex.T, extra: { neighbors: Hex.T[] }) => void;
     while?: (hex: Hex.T) => boolean;
   }
 ) {
   return breadthFirst(grid, Hex.ORIGIN, {
-    tap: () => {},
+    tap: options.tap ?? (() => {}),
     while: () => true,
     ...options,
   });
@@ -87,6 +94,43 @@ function boundaryHexes(grid: Grid.T): Grid.T {
     ids: boundingIds,
     hexes: boundingHexes,
   };
+}
+
+const GRAPH_COST = 1;
+
+function path(from: Hex.T, to: Hex.T, grid: Grid.T) {
+  const frontier = new PriorityQueue<Hex.T>();
+  frontier.push(0, from);
+  const cameFrom: Record<Hex.Id, Hex.T | null> = {};
+  const costSoFar: Record<Hex.Id, number> = {};
+  cameFrom[from.id] = null;
+  costSoFar[from.id] = 0;
+
+  let i = 0;
+  while (frontier.size) {
+    if (++i > 10e3) throw new Error("loop");
+    const current = frontier.pop();
+    if (current === to) break;
+    for (const next of neighbors(current, grid)) {
+      const newCost = costSoFar[current.id] + GRAPH_COST;
+      if (!(next.id in costSoFar) || newCost < costSoFar[next.id]) {
+        costSoFar[next.id] = newCost;
+        const distance = Axial.distance(to.pos, next.pos);
+        const priority = newCost + distance;
+        frontier.push(priority, next);
+        cameFrom[next.id] = current;
+      }
+    }
+  }
+
+  const path: Hex.T[] = [];
+  let node: null | Hex.T = to;
+  while (node) {
+    path.unshift(node);
+    node = cameFrom[node.id];
+  }
+
+  return path;
 }
 
 function fromHexes(hexes: Hex.T[]): Grid.T {
@@ -150,4 +194,5 @@ function randomHexGrid(
 export const Grid = {
   randomHexGrid,
   traverse,
+  path,
 };
