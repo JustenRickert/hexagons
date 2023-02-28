@@ -1,108 +1,13 @@
-import { RefObject } from "preact";
-import { useCallback, useEffect, useRef } from "preact/hooks";
-import { ifElse, lensPath, lensProp, set, when } from "ramda";
+import { JSX, RefObject } from "preact";
+import { useCallback, useEffect, useMemo, useRef } from "preact/hooks";
+
 import { makeAtom, useAtom } from "../game/state";
 import { Axial, Hex } from "../grid";
 import { HexSvg } from "../grid/hex-svg";
 import { ViewSvg } from "../grid/view-svg";
-import { assert, mouseEvents, pipeM } from "../util";
+import { assert, mouseEvents } from "../util";
 
-interface Piece {
-  id: string;
-  pos: Axial.T;
-}
-
-namespace Board {
-  export interface T {
-    selectedHexId: "" | Hex.Id;
-    grid: Record<Hex.Id, Hex.T>;
-    pieces: Record<string, Piece>;
-  }
-
-  const UNSELECTED_HEX_COLOR = "lightgray";
-  const SELECTED_HEX_COLOR = "yellow";
-
-  const defaultPieces = [
-    {
-      id: "first",
-      pos: { q: 1, r: 1 },
-    },
-  ];
-
-  const defaultHexes = [
-    ...[1, 2, 3].flatMap((ringSize) =>
-      Axial.ring(ringSize, { q: 0, r: 0 }).map((pos) =>
-        Hex.make({ pos, color: UNSELECTED_HEX_COLOR })
-      )
-    ),
-  ].map(Hex.make);
-
-  export function make(): T {
-    return {
-      selectedHexId: "",
-      pieces: defaultPieces.reduce<Record<string, Piece>>(
-        (grid, hex) => ({
-          ...grid,
-          [hex.id]: hex,
-        }),
-        {}
-      ),
-      // grid: xprod(range(-2, 2), range(-2, 2))
-      //   .map(([q, r]) =>
-      //     Hex.make({
-      //       // pos: { q: q - Math.floor(r / 2), r },
-      //       pos: { q, r },
-      //       color: "gray",
-      //     })
-      //   )
-      grid: defaultHexes.reduce<Record<Hex.Id, Hex.T>>(
-        (grid, hex) => ({
-          ...grid,
-          [hex.id]: hex,
-        }),
-        {}
-      ),
-    };
-  }
-
-  export const atom = makeAtom("chesslike-board", Board.make(), []);
-
-  export function useBoard() {
-    const [board, setBoard] = useAtom(atom);
-
-    return {
-      board,
-      selectHex: useCallback((hex: Hex.T) => {
-        const toggleSelected = pipeM<T>(
-          set(lensPath(["grid", hex.id, "color"]), UNSELECTED_HEX_COLOR),
-          set(lensProp("selectedHexId"), "")
-        );
-
-        const selectNewHex = pipeM<T>(
-          when(
-            (b) => Boolean(b.selectedHexId),
-            (b) =>
-              set(
-                lensPath(["grid", b.selectedHexId, "color"]),
-                UNSELECTED_HEX_COLOR,
-                b
-              )
-          ),
-          set(lensPath(["grid", hex.id, "color"]), SELECTED_HEX_COLOR),
-          set(lensProp("selectedHexId"), hex.id)
-        );
-
-        setBoard(
-          ifElse(
-            (b) => b.selectedHexId === hex.id,
-            toggleSelected,
-            selectNewHex
-          )
-        );
-      }, []),
-    };
-  }
-}
+import * as Board from "./board";
 
 // TODO
 function useDragPiece(view: RefObject<SVGElement>) {
@@ -135,21 +40,43 @@ function useDragPiece(view: RefObject<SVGElement>) {
   }, []);
 }
 
-function PieceSvg({ piece }: { piece: Piece }) {
-  const { x, y } = Axial.cartesian(piece.pos);
+function PieceSvg({ piece }: { piece: Board.Piece }) {
+  const { pos } = Board.useBoardPiece(piece.id);
+  let el: JSX.Element;
+  switch (piece.id) {
+    case "piece-automaton":
+      el = <circle r={25} />;
+      break;
+    case "piece-mom":
+      el = <polygon points="0,-34 34,0 0,34 -34,0" />;
+      break;
+    case "piece-dad":
+      el = <polygon points="-25,-25 25,-25 25,25 -25,25" />;
+      break;
+    default:
+      console.error("id `%s` not found", piece.id);
+      throw new Error();
+  }
   return (
-    <circle
+    <g
       style={{
+        transition: "transform 100ms",
         pointerEvents: "none",
       }}
-      cx={x}
-      cy={y}
-      r={40}
-    />
+      transform={Axial.translatef(pos)}
+    >
+      {el}
+    </g>
   );
 }
 
-function HexGrid({ onClick }: { onClick: (h: Hex.T) => void }) {
+function HexGrid({
+  onClickHex,
+  onRightClickHex,
+}: {
+  onRightClickHex?: (h: Hex.T) => void;
+  onClickHex: (h: Hex.T) => void;
+}) {
   const [board] = useAtom(Board.atom);
   return (
     <>
@@ -158,8 +85,8 @@ function HexGrid({ onClick }: { onClick: (h: Hex.T) => void }) {
           <HexSvg
             key={hex.id}
             hex={hex}
-            onClick={onClick}
-            // onRightClick={}
+            onClick={onClickHex}
+            onRightClick={onRightClickHex}
           />
         ))}
       </g>
@@ -167,29 +94,67 @@ function HexGrid({ onClick }: { onClick: (h: Hex.T) => void }) {
   );
 }
 
+namespace Game {
+  const atom = makeAtom({
+    key: "automaton",
+    defaultValue: {
+      automaton: {
+        language: 0,
+      },
+    },
+  });
+
+  export function useAutomatonLanguageGeneration() {
+    const { board } = Board.useBoard();
+    const automaton = board.pieces["piece-automaton"];
+    const neighbors = useMemo(
+      () => Board.piecesNeighbors(automaton, board),
+      [automaton, board]
+    );
+  }
+
+  export function useGame() {
+    const [game, setGame] = useAtom(atom);
+    return {
+      game,
+    };
+  }
+}
+
 export default function ChessLikeGame() {
   const ref = useRef<SVGSVGElement>(null);
   const {
     board: { pieces, grid },
-    selectHex,
+    pieceSelected,
+    selectPiece,
+    moveSelectedPiece,
   } = Board.useBoard();
+
+  const { game } = Game.useGame();
 
   const handleSelectHex = useCallback<(h: Hex.T) => void>(
     (hex) => {
-      // TODO need better way to do this?
-      const isPieceAtHex = Object.values(pieces).some(
-        (p) => Axial.id(p.pos) === hex.id
-      );
-      if (isPieceAtHex) selectHex(hex);
+      const pieceAtHex = Object.values(pieces).find((p) => p.hexId === hex.id);
+      if (pieceSelected && pieceSelected.hexId !== hex.id) {
+        if (!pieceAtHex) moveSelectedPiece(hex);
+        return;
+      }
+      if (!pieceAtHex) return;
+      selectPiece(pieceAtHex);
     },
-    [pieces, grid, selectHex]
+    [pieces, grid, selectPiece, pieceSelected, moveSelectedPiece]
   );
 
   return (
     <div>
+      <div style={{ position: "absolute" }}>
+        Acquired language: {game.automaton.language}
+      </div>
       <ViewSvg svgRef={ref} disabledPanning>
-        <HexGrid onClick={handleSelectHex} />
-        <PieceSvg piece={pieces["first"]} />
+        <HexGrid onClickHex={handleSelectHex} />
+        <PieceSvg piece={pieces["piece-automaton"]} />
+        <PieceSvg piece={pieces["piece-mom"]} />
+        <PieceSvg piece={pieces["piece-dad"]} />
       </ViewSvg>
     </div>
   );

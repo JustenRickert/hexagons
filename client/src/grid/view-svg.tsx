@@ -10,11 +10,12 @@ const VIEW_HEIGHT = 2000;
  * TODO Need to preserve drag offset after window resize events
  */
 function useScreenPanning(
-  view: RefObject<SVGSVGElement>,
+  view: RefObject<SVGSVGElement> | undefined,
   screen: { width: number; height: number; dpi: number },
   { disabled }: { disabled: boolean }
 ) {
   useEffect(() => {
+    if (!view) return;
     if (disabled) return;
     assert(view.current);
     let down = false;
@@ -56,7 +57,7 @@ function useScreenPanning(
 }
 
 function useScreen(
-  view: RefObject<SVGSVGElement>,
+  view: RefObject<SVGSVGElement> | undefined,
   options: {
     disabledPanning: boolean;
   }
@@ -70,6 +71,7 @@ function useScreen(
   }));
 
   useEffect(() => {
+    if (!view) return;
     const handle = () => {
       assert(view.current);
       setState({
@@ -98,7 +100,7 @@ export const ViewSvg = memo(function SvgView({
   children,
   disabledPanning = false,
 }: {
-  svgRef: RefObject<SVGSVGElement>;
+  svgRef?: RefObject<SVGSVGElement>;
   children: JSX.Element | JSX.Element[];
   disabledPanning?: boolean;
 }) {

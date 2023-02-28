@@ -9,11 +9,11 @@ const AtomContext = createContext<[Record<string, any>, (state: any) => any]>([
   () => {},
 ]);
 
-const registeredDefaultState: Record<string, any> = {};
+const registeredDefaultValues: Record<string, any> = {};
 
 export function AtomProvider({ children }: { children: ComponentChildren }) {
   const [record, setRecord] = useState(() => {
-    return registeredDefaultState;
+    return registeredDefaultValues;
   });
   return (
     <AtomContext.Provider value={[record, setRecord]}>
@@ -24,24 +24,64 @@ export function AtomProvider({ children }: { children: ComponentChildren }) {
 
 interface Atom<S> {
   key: string;
-  defaultState: S;
-  effects: ((stream: Observable<S>) => Observable<(s: S) => S>)[];
+  defaultValue: S;
+  effects?: ((stream: Observable<S>) => Observable<(s: S) => S>)[];
   // effects: ((state: S, setState: (fn: (s: S) => S) => void) => () => void)[];
 }
 
-export function makeAtom<S>(
-  key: string,
-  defaultValue: S,
-  effects: Atom<S>["effects"] = []
-): Atom<S> {
-  assert(!(key in registeredDefaultState));
-  registeredDefaultState[key] = defaultValue;
+// interface ComputedAtom<S, T> {
+//   parent: Atom<S>;
+//   lens: {
+//     get: (s: S) => T;
+//     set: (s: S, t: T) => S;
+//   };
+// }
+
+export function makeAtom<S>({
+  key,
+  defaultValue,
+  effects = [],
+}: {
+  key: string;
+  defaultValue: S;
+  effects?: Atom<S>["effects"];
+}): Atom<S> {
+  assert(!(key in registeredDefaultValues), "duplicate atom key `%s`", key);
+  registeredDefaultValues[key] = defaultValue;
   return {
     key,
-    defaultState: defaultValue,
+    defaultValue,
     effects,
   };
 }
+
+// export function makeComputed<S, T>({
+//   atom,
+//   key,
+//   lens,
+// }: {
+//   atom: Atom<S>;
+//   key: string;
+//   lens: {
+//     get: (s: S) => T;
+//     set: (s: S, T: T) => S;
+//   };
+// }): ComputedAtom<S, T> {
+//   assert(!(key in registeredDefaultValues), "duplicate atom key `%s`", key);
+//   return {
+//     parent,
+//     key,
+//     defaultValue: lens.get(atom.defaultValue),
+//     lens,
+//   };
+// }
+
+// function useComputed<S, T>(atom: ComputedAtom<S, T>) {
+//   const [record, setRecord] = useContext(AtomContext);
+//   atom.lens.get(record[atom.parent.key])
+//   return [
+//   ];
+// }
 
 export function useAtom<S>(atom: Atom<S>) {
   const [record, setRecord] = useContext(AtomContext);
@@ -85,8 +125,9 @@ function useChangedDebug(values: any[]) {
 export function useAtomEffects<S>(atom: Atom<S>) {
   const [, setState] = useAtom(atom);
   const state$ = useStateObservable(atom);
-  useChangedDebug([atom, state$]);
+  // useChangedDebug([atom, state$]);
   useEffect(() => {
+    if (!atom.effects) return;
     const subs = atom.effects.map((effect) =>
       effect(state$).subscribe({
         next(reducer) {
