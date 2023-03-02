@@ -1,77 +1,49 @@
 import { useCallback, useMemo } from "preact/hooks";
-import { ifElse, lensPath, lensProp, set, when } from "ramda";
-import { makeAtom, useAtom } from "../game/state";
+import { ifElse, lensPath, lensProp, over, set, when } from "ramda";
+import { useAtom } from "../game/state";
 import { Axial, Hex } from "../grid";
 import { assert, pipeM } from "../util";
+import { SELECTED_HEX_COLOR, UNSELECTED_HEX_COLOR } from "./constants";
+import * as State from "./state";
+import { Board, Piece } from "./types";
 
-export type PieceId = `piece-${string}`;
+export type T = Board.T;
 
-export interface Piece {
-  id: PieceId;
-  hexId: Hex.Id;
+function truthy<T>(t: T | undefined): t is T {
+  return Boolean(t);
 }
 
-export interface T {
-  selectedPieceId: "" | PieceId;
-  grid: Record<Hex.Id, Hex.T>;
-  pieces: Record<PieceId, Piece>;
-}
-
-function piecesRing(dist: number, piece: Piece, board: T) {
+function piecesRing(dist: number, piece: Piece.T, board: T) {
   const hex = board.grid[piece.hexId];
   assert(hex);
   const pieces = Object.values(board.pieces);
   return Axial.ring(dist, hex.pos)
     .map((pos) => pieces.find((p) => p.hexId === Axial.id(pos)))
-    .filter(Boolean);
+    .filter(truthy);
 }
 
-export function piecesNeighbors(piece: Piece, board: T) {
+export function piecesNeighbors(piece: Piece.T, board: T) {
   return piecesRing(1, piece, board);
 }
 
-const UNSELECTED_HEX_COLOR = "lightgray";
-const SELECTED_HEX_COLOR = "yellow";
-
-const defaultHexes = [
-  Hex.make({ pos: { q: 0, r: 0 }, color: UNSELECTED_HEX_COLOR }),
-  ...Axial.ring(1, { q: 0, r: 0 }).map((pos) =>
-    Hex.make({ pos, color: UNSELECTED_HEX_COLOR })
-  ),
-].map(Hex.make);
-
-const defaultPieces: Piece[] = [
-  {
-    id: "piece-automaton",
-    hexId: defaultHexes[0].id,
-  },
-  {
-    id: "piece-mom",
-    hexId: defaultHexes[1].id,
-  },
-  {
-    id: "piece-dad",
-    hexId: defaultHexes[2].id,
-  },
-];
-
-export function make(): T {
-  return {
-    selectedPieceId: "",
-    pieces: Object.fromEntries(defaultPieces.map((p) => [p.id, p])),
-    grid: Object.fromEntries(defaultHexes.map((hex) => [hex.id, hex])),
-  };
-}
-
-export const atom = makeAtom({
-  key: "chesslike-board",
-  defaultValue: make(),
-  effects: [],
-});
+// export function useGridIdList() {
+//   const [{ board }] = useAtom(State.atom);
+//     return useMemo(() => Object.values(board.grid), []) ;
+// }
 
 export function useBoard() {
-  const [board, setBoard] = useAtom(atom);
-  const { selectedPieceId, pieces } = board;
+  const [
+    {
+      board,
+      board: { selectedPieceId, pieces },
+    },
+    setState,
+  ] = useAtom(State.atom);
+
+  const setBoard = useCallback(
+    (reducer: (state: T) => T) => setState(over(lensProp("board"), reducer)),
+    []
+  );
 
   const pieceSelected = useMemo(
     () => (selectedPieceId ? pieces[selectedPieceId] : null),
@@ -90,9 +62,11 @@ export function useBoard() {
 
   return {
     board,
+
     pieceSelected,
+
     selectPiece: useCallback(
-      (piece: Piece) => {
+      (piece: Piece.T) => {
         const toggleSelected = pipeM<T>(
           (b) => highlightHex(piece.hexId, false, b),
           set(lensProp("selectedPieceId"), "")
@@ -117,6 +91,7 @@ export function useBoard() {
       },
       [pieceSelected, highlightHex]
     ),
+
     moveSelectedPiece: useCallback(
       (hex: Hex.T) => {
         if (!pieceSelected) return;
@@ -133,15 +108,14 @@ export function useBoard() {
   };
 }
 
-export function useBoardPiece(pieceId: PieceId) {
-  const [board, setBoard] = useAtom(atom);
+export function useBoardPiece(pieceId: Piece.Id) {
+  const { board } = useBoard();
   const piece = board.pieces[pieceId];
-  assert(piece, {
-    piece,
-    board,
-  });
-  return {
-    ...piece,
-    pos: board.grid[piece.hexId].pos,
-  };
+  assert(piece);
+  return useMemo(() => {
+    return {
+      ...piece,
+      pos: board.grid[piece.hexId].pos,
+    };
+  }, [piece, board]);
 }

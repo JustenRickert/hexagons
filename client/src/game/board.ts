@@ -38,7 +38,7 @@ const defaultBoard = {
   borders: makeBorders(defaultGrid),
 };
 
-export const atom = makeAtom<T>("board", defaultBoard);
+// export const atom = makeAtom<T>("board", defaultBoard);
 
 export function useHexIds() {
   const [

@@ -1,46 +1,48 @@
-import { JSX, RefObject } from "preact";
-import { useCallback, useEffect, useMemo, useRef } from "preact/hooks";
+import { JSX } from "preact";
+import { useCallback, useMemo, useRef } from "preact/hooks";
+import { lensProp, over } from "ramda";
 
-import { makeAtom, useAtom } from "../game/state";
+import { useAtom } from "../game/state";
 import { Axial, Hex } from "../grid";
 import { HexSvg } from "../grid/hex-svg";
 import { ViewSvg } from "../grid/view-svg";
-import { assert, mouseEvents } from "../util";
 
 import * as Board from "./board";
+import * as State from "./state";
+import { Automaton, Piece } from "./types";
 
-// TODO
-function useDragPiece(view: RefObject<SVGElement>) {
-  useEffect(() => {
-    if (!view.current) return;
+// TODO I think aesthetically I don't want this. We'll see
+// function useDragPiece(view: RefObject<SVGElement>) {
+//   useEffect(() => {
+//     if (!view.current) return;
 
-    let down: null | [number, number];
+//     let down: null | [number, number];
 
-    const unsubscribe = mouseEvents(view.current, {
-      onDown(e) {
-        console.log(e);
-        down = [e.offsetX, e.offsetY];
-      },
-      onMove() {
-        assert(view.current);
-        if (!down) return;
-        // view.current.setAttribute(
-        //   "transform",
-        //   `translate(${-down[0]}, ${-down[1]})`
-        // );
-      },
-      onUp() {
-        assert(view.current);
-        down = null;
-        // view.current.setAttribute("transform", `translate(0, 0)`);
-      },
-    });
+//     const unsubscribe = mouseEvents(view.current, {
+//       onDown(e) {
+//         console.log(e);
+//         down = [e.offsetX, e.offsetY];
+//       },
+//       onMove() {
+//         assert(view.current);
+//         if (!down) return;
+//         // view.current.setAttribute(
+//         //   "transform",
+//         //   `translate(${-down[0]}, ${-down[1]})`
+//         // );
+//       },
+//       onUp() {
+//         assert(view.current);
+//         down = null;
+//         // view.current.setAttribute("transform", `translate(0, 0)`);
+//       },
+//     });
 
-    return unsubscribe;
-  }, []);
-}
+//     return unsubscribe;
+//   }, []);
+// }
 
-function PieceSvg({ piece }: { piece: Board.Piece }) {
+function PieceSvg({ piece }: { piece: Piece.T }) {
   const { pos } = Board.useBoardPiece(piece.id);
   let el: JSX.Element;
   switch (piece.id) {
@@ -77,7 +79,7 @@ function HexGrid({
   onRightClickHex?: (h: Hex.T) => void;
   onClickHex: (h: Hex.T) => void;
 }) {
-  const [board] = useAtom(Board.atom);
+  const { board } = Board.useBoard();
   return (
     <>
       <g class="hexes">
@@ -95,30 +97,50 @@ function HexGrid({
 }
 
 namespace Game {
-  const atom = makeAtom({
-    key: "automaton",
-    defaultValue: {
-      automaton: {
-        language: 0,
+  export function useAutomaton() {
+    const [
+      {
+        board: {
+          pieces: { ["piece-automaton"]: piece },
+          grid,
+        },
+        automaton,
       },
-    },
-  });
+      setState,
+    ] = useAtom(State.atom);
+    const hex = grid[piece.hexId];
 
-  export function useAutomatonLanguageGeneration() {
-    const { board } = Board.useBoard();
-    const automaton = board.pieces["piece-automaton"];
-    const neighbors = useMemo(
-      () => Board.piecesNeighbors(automaton, board),
-      [automaton, board]
-    );
+    const setAutomaton = useCallback<
+      (reducer: (t: Automaton.T) => Automaton.T) => void
+    >((reducer) => setState(over(lensProp("automaton"), reducer)), []);
+
+    return {
+      automaton: useMemo(
+        () => ({
+          ...automaton,
+          ...piece,
+        }),
+        [automaton, piece]
+      ),
+    };
   }
 
   export function useGame() {
-    const [game, setGame] = useAtom(atom);
+    const [game, setGame] = useAtom(State.atom);
     return {
       game,
     };
   }
+
+  // export function useAutomatonLanguageGeneration() {
+  //   const { board } = Board.useBoard();
+  //   const { automaton } = useAutomaton();
+  //   const neighbors = useMemo(
+  //     () => Board.piecesNeighbors(automaton, board),
+  //     [automaton, board]
+  //   );
+  //   console.log({ neighbors });
+  // }
 }
 
 export default function ChessLikeGame() {
