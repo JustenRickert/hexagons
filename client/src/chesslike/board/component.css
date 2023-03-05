@@ -1,0 +1,26 @@
+.piece-svg {
+  transition: transform 250ms, filter 500ms;
+  pointer-events: none;
+}
+
+.piece-svg circle,
+.piece-svg polygon {
+  fill: #363636;
+  stroke: #363636;
+}
+
+@keyframes pulse {
+  0% {
+    fill: var(--pulse-color-start);
+  }
+  100% {
+    fill: var(--pulse-color-end);
+  }
+}
+
+.piece-svg .language-connection {
+  --pulse-color-start: #363636;
+  --pulse-color-end: #0057ff;
+
+  animation: pulse 1s infinite alternate cubic-bezier(1, 0.01, 0.31, 1.05);
+}

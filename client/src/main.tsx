@@ -1,11 +1,11 @@
 import { render } from "preact";
 import { App } from "./app";
-import { AtomProvider } from "./game/state";
+import { StateProvider } from "./chesslike/state-provider";
 import "./index.css";
 
 render(
-  <AtomProvider>
+  <StateProvider>
     <App />
-  </AtomProvider>,
+  </StateProvider>,
   document.getElementById("app") as HTMLElement
 );

@@ -11,6 +11,46 @@ export interface T {
   r: number;
 }
 
+export namespace Cartesian {
+  interface T {
+    x: number;
+    y: number;
+  }
+
+  export function perpendicular(c: T) {
+    return {
+      x: c.y,
+      y: -c.x,
+    };
+  }
+
+  export function delta(c1: T, c2: T) {
+    return {
+      x: c2.x - c1.x,
+      y: c2.y - c1.y,
+    };
+  }
+
+  export function dist(c1: T, c2: T) {
+    return Math.sqrt((c2.x - c1.x) ** 2 + (c2.y - c1.y) ** 2);
+  }
+
+  export function mid(c1: T, c2: T) {
+    return {
+      x: (1 / 2) * (c1.x + c2.x),
+      y: (1 / 2) * (c1.y + c2.y),
+    };
+  }
+
+  export function unit(c: T) {
+    const m = Math.sqrt(c.x ** 2 + c.y ** 2);
+    return {
+      x: c.x / m,
+      y: c.y / m,
+    };
+  }
+}
+
 export function cartesian({ q, r }: T) {
   const x = 100 * (3 / 2) * r;
   const y = 100 * ((Math.sqrt(3) / 2) * r + Math.sqrt(3) * q);
@@ -41,9 +81,9 @@ export function angle(a1: T, a2: T) {
   return (180 / Math.PI) * Math.atan2(dy, dx) + 90;
 }
 
-export function translatef(a: T) {
+export function translatef(a: T, unit = "") {
   const { x, y } = cartesian(a);
-  return `translate(${x}, ${y})`;
+  return `translate(${x}${unit}, ${y}${unit})`;
 }
 
 export function distance(a1: T, a2: T) {

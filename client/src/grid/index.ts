@@ -25,7 +25,7 @@ function gridRing(dist: number, hex: Hex.T, grid: Grid.T): Hex.T[] {
 }
 
 // can probably by memoized ?
-function neighbors(hex: Hex.T, grid: Grid.T) {
+function neighbors(hex: Hex.T | Hex.Id, grid: Grid.T) {
   return gridRing(1, hex, grid);
 }
 
@@ -193,6 +193,8 @@ function randomHexGrid(
 
 export const Grid = {
   randomHexGrid,
+  // ring: gridRing,
+  neighbors,
   traverse,
   path,
 };

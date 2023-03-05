@@ -1,10 +1,9 @@
-import { effect } from "@preact/signals";
 import { ComponentChildren, createContext } from "preact";
 import { memo } from "preact/compat";
 import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { lensProp, over, zip } from "ramda";
 import { Observable, Subject, Subscription } from "rxjs";
-import { distinct, distinctUntilChanged, map, startWith } from "rxjs/operators";
+import { distinctUntilChanged, map } from "rxjs/operators";
 import { assert } from "../util";
 
 interface Atom<S> {
@@ -27,8 +26,8 @@ interface AtomRegistration<S> {
 //   };
 // }
 
-function useStateObservable<S>(atom: Atom<S>) {
-  const [state, setState] = useAtom(atom);
+export function useAtomObservable<S>(atom: Atom<S>) {
+  const [state] = useAtom(atom);
   const subscription = useMemo(() => new Subject<S>(), []);
   const observable = useMemo(() => subscription.asObservable(), [subscription]);
   useEffect(() => {
@@ -37,7 +36,7 @@ function useStateObservable<S>(atom: Atom<S>) {
   return observable;
 }
 
-function useChangedDebug(values: any[]) {
+export function useChangedDebug(values: any[]) {
   const prior = useRef<null | any[]>(values);
   useEffect(() => {
     if (!prior.current) {
@@ -56,7 +55,7 @@ function useChangedDebug(values: any[]) {
 
 export function useAtomEffects<S>(atom: Atom<S>) {
   const [, setState] = useAtom(atom);
-  const state$ = useStateObservable(atom);
+  const state$ = useAtomObservable(atom);
   // useChangedDebug([atom, state$]);
   useEffect(() => {
     if (!atom.effects) return;
@@ -93,6 +92,12 @@ const atomRegistration: Record<string, AtomRegistration<any>> = {};
 const record$ = new Subject<Record<string, any>>();
 
 export function AtomProvider({ children }: { children: ComponentChildren }) {
+  // HACK: In developement, module reloading saves react state but not module
+  // state. So here we save module state in react state to not lose information
+  // that was only recorded on the module level. It works! Though one will need
+  // to do a hard reload when using new `makeAtom`s while developing, which
+  // isn't obvious.
+  const [providerAtomRegistration] = useState(() => atomRegistration);
   const [record, setRecord] = useState(() =>
     Object.fromEntries(
       Object.entries(atomRegistration).map(([key, atom]) => [
@@ -108,9 +113,7 @@ export function AtomProvider({ children }: { children: ComponentChildren }) {
 
   useEffect(() => {
     const subs: Subscription[] = [];
-    console.log("starting");
-
-    for (const [key, { effects }] of Object.entries(atomRegistration)) {
+    for (const [key, { effects }] of Object.entries(providerAtomRegistration)) {
       if (!effects) continue;
       for (const effect of effects) {
         subs.push(
@@ -127,9 +130,8 @@ export function AtomProvider({ children }: { children: ComponentChildren }) {
         );
       }
     }
-    record$.next(record);
+
     return () => {
-      console.log("huh?");
       subs.forEach((sub) => sub.unsubscribe());
     };
   }, []);
@@ -201,3 +203,5 @@ export function useAtom<S>(atom: Atom<S>) {
       })),
   ] as [S, (fn: (s: S) => S) => void];
 }
+
+export function useAtomSetState<S>(atom: Atom<S>) {}

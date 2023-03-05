@@ -1,4 +1,5 @@
-import { Observable, Subject } from "rxjs";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { distinctUntilChanged, Observable } from "rxjs";
 import { assert } from "../util";
 
 function randomFloat(low: number, high: number) {
@@ -10,7 +11,7 @@ function randomFloat(low: number, high: number) {
 /**
  * deviate number `n` +/- percent `deviation`
  */
-function deviate(n: number, deviation: number) {
+export function deviate(n: number, deviation: number) {
   return n * (1 + deviation * randomFloat(-1, 1));
 }
 
@@ -51,4 +52,54 @@ export function interval(
     });
     return stop;
   });
+}
+
+export function truthy<T>(t: T | undefined): t is T {
+  return Boolean(t);
+}
+
+export function useLatest<T>(
+  stream: Observable<T>,
+  defaultValue: T | (() => T)
+) {
+  const [state, setState] = useState(defaultValue);
+  useEffect(() => {
+    stream.pipe(distinctUntilChanged()).subscribe({
+      next: setState,
+    });
+  }, []);
+  return state;
+}
+
+export function fromEntries<K extends string, T>(entries: [K, T][]) {
+  return Object.fromEntries(entries) as Record<K, T>;
+}
+
+export function useChangedDebug(name: string, values: Record<string, any>) {
+  const prior = useRef<Record<string, any>>(values);
+  useEffect(() => {
+    if (!prior.current) {
+      prior.current = values;
+      return;
+    }
+
+    const changed = Object.keys(values)
+      .map((key) => {
+        const n = values[key];
+        const o = prior.current[key];
+        return {
+          key,
+          old: n,
+          new: o,
+          changed: n !== o,
+        };
+      })
+      .filter((o) => o.changed);
+
+    if (changed.length) {
+      console.log("%s values changed %s name", changed.length, name, changed);
+    }
+
+    prior.current = values;
+  }, Object.values(values));
 }

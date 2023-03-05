@@ -1,7 +1,11 @@
 import "./app.css";
 
 import ChessLikeGame from "./chesslike";
+import { useAtom } from "./game/state";
 import { Hex } from "./grid";
+import * as State from "./chesslike/state";
+import { useContext } from "preact/hooks";
+import { StateContext } from "./chesslike/state-provider";
 
 function timeFn<F extends (a: any) => any>(name: string, fn: F) {
   return (...args: Parameters<F>) => {
@@ -127,6 +131,8 @@ function MenuMode() {}
 // <GameMode />
 
 export function App() {
+  const context = useContext(StateContext);
+  console.log(context, "renderenig");
   return (
     <div>
       <ChessLikeGame />

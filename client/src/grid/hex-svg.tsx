@@ -1,4 +1,8 @@
 import { useCallback, useLayoutEffect, useRef } from "preact/hooks";
+import {
+  SELECTED_HEX_COLOR,
+  UNSELECTED_HEX_COLOR,
+} from "../chesslike/constants";
 import { assert } from "../util";
 import * as Axial from "./axial";
 import { T } from "./hex";
@@ -6,12 +10,16 @@ import { T } from "./hex";
 export function HexSvg({
   hex,
   onClick = () => {},
+  color,
   onRightClick = () => {},
+  selected,
   showCoordinate = false,
 }: {
   hex: T;
+  color?: string;
   onClick?: (hex: T) => void;
   onRightClick?: (hex: T) => void;
+  selected: boolean;
   showCoordinate?: boolean;
 }) {
   const ref = useRef<SVGPolygonElement>(null);
@@ -80,7 +88,7 @@ export function HexSvg({
         // TODO Not sure yet if there are benefits to the above alternative way
         // to do this
         onClick={() => onClick(hex)}
-        fill={hex.color}
+        fill={selected ? SELECTED_HEX_COLOR : UNSELECTED_HEX_COLOR}
         points="100,0 50,-87 -50,-87 -100,-0 -50,87 50,87"
       />
       {showCoordinate && (

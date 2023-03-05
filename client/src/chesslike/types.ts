@@ -6,6 +6,8 @@ export namespace Piece {
   export interface T {
     id: Id;
     hexId: Hex.Id;
+    gives: { language?: number };
+    strayMovement: boolean;
   }
 }
 
