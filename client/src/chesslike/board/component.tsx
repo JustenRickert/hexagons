@@ -8,7 +8,14 @@ import { HexSvg } from "../../grid/hex-svg";
 import { ViewSvg } from "../../grid/view-svg";
 import { Piece } from "../types";
 
-import * as Board from "./board";
+import {
+  useBoard,
+  useBoardPiece,
+  useHex,
+  usePieceConnection,
+  useSelectedPiece,
+} from "./hooks";
+import { getPieceConfig } from "./piece-config";
 
 const HexGridHex = memo(function HexGridHex({
   hexId,
@@ -19,7 +26,7 @@ const HexGridHex = memo(function HexGridHex({
   onRightClick?: (h: Hex.T) => void;
   onClick: (h: Hex.T) => void;
 }) {
-  const { hex, selected } = Board.useHex(hexId);
+  const { hex, selected } = useHex(hexId);
   return (
     <HexSvg
       selected={selected}
@@ -37,7 +44,7 @@ function HexGrid({
   onRightClickHex?: (h: Hex.T) => void;
   onClickHex: (h: Hex.T) => void;
 }) {
-  const { board } = Board.useBoard();
+  const { board } = useBoard();
   return (
     <>
       <g class="hexes">
@@ -62,44 +69,78 @@ function classes(cs: Record<string, boolean>) {
 }
 
 function PieceSvg({ piece }: { piece: Piece.T }) {
-  const { pos } = Board.useBoardPiece(piece.id);
-  let el: JSX.Element;
+  const { pos } = useBoardPiece(piece.id);
+  // let el: JSX.Element;
 
-  const connection = Board.usePieceConnection(piece.id);
+  const connection = usePieceConnection(piece.id);
 
   const borderColor = connection.language ? "lightblue" : "black";
 
   // const pulseBorder = <animate attributeName="strokeWidth"></animate>
 
-  switch (piece.id) {
-    case "piece-automaton":
-      el = <circle stroke={borderColor} r={25} />;
-      break;
-    case "piece-mom":
-      el = (
-        <polygon
-          class={classes({
-            "language-connection": Boolean(connection.language),
-          })}
-          points="0,-34 34,0 0,34 -34,0"
-        />
-      );
-      break;
-    case "piece-dad":
-      el = (
-        <polygon
-          class={classes({
-            "language-connection": Boolean(connection.language),
-          })}
-          stroke={borderColor}
-          points="-25,-25 25,-25 25,25 -25,25"
-        />
-      );
-      break;
-    default:
-      console.error("id `%s` not found", piece.id);
-      throw new Error();
-  }
+  const { svg } = getPieceConfig(piece.id);
+
+  // TODO css classes don't apply to image svgs. I think probably should move
+  // the coloring to the hex behind the piece svg maybe. Dunno just spit-balling
+  const el = svg ? (
+    <image
+      style={{
+        transform: "translate(-50px, -50px)",
+      }}
+      height={100}
+      width={100}
+      href={svg}
+    />
+  ) : (
+    <circle
+      class={classes({
+        "language-connection": Boolean(connection.language),
+      })}
+      r={50}
+      cx={0}
+      cy={0}
+    />
+  );
+
+  // switch (piece.id) {
+  //   case "piece-automaton":
+  //     const { svg } = getPieceConfig(piece.id);
+  //     el = (
+  //       <image
+  //         style={{
+  //           transform: "translate(-50px, -50px)",
+  //         }}
+  //         height={100}
+  //         width={100}
+  //         href={svg}
+  //       />
+  //     );
+  //     break;
+  //   case "piece-mom":
+  //     el = (
+  //       <polygon
+  //         class={classes({
+  //           "language-connection": Boolean(connection.language),
+  //         })}
+  //         points="0,-34 34,0 0,34 -34,0"
+  //       />
+  //     );
+  //     break;
+  //   case "piece-dad":
+  //     el = (
+  //       <polygon
+  //         class={classes({
+  //           "language-connection": Boolean(connection.language),
+  //         })}
+  //         stroke={borderColor}
+  //         points="-25,-25 25,-25 25,25 -25,25"
+  //       />
+  //     );
+  //     break;
+  //   default:
+  //     console.error("id `%s` not found", piece.id);
+  //     throw new Error();
+  // }
 
   return (
     <g
@@ -119,12 +160,12 @@ function PieceSvg({ piece }: { piece: Piece.T }) {
 
 export function GameBoard() {
   const ref = useRef<SVGSVGElement>(null);
+  const pieceSelected = useSelectedPiece();
   const {
     board: { pieces, grid },
-    pieceSelected,
     selectPiece,
     moveSelectedPiece,
-  } = Board.useBoard();
+  } = useBoard();
 
   const handleSelectHex = useCallback<(h: Hex.T) => void>(
     (hex) => {

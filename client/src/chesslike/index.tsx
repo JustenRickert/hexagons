@@ -1,11 +1,17 @@
-import { useContext, useEffect, useRef, useState } from "preact/hooks";
+import "./index.css";
+
+import { useCallback, useEffect, useRef } from "preact/hooks";
+import { add, lensPath, over, set } from "ramda";
 import { map } from "rxjs";
 
 import { Axial, Hex } from "../grid";
+import { assert, pipeM } from "../util";
 
 import { GameBoard } from "./board/component";
-import { StateContext } from "./state-provider";
-import { State } from "./types";
+import { useGameStreamState, useSelectedPiece } from "./board/hooks";
+import { usePieceConfig } from "./board/piece-config";
+import { useGameState, useSetGameState } from "./state-provider";
+import { Piece, State } from "./types";
 
 // TODO I think aesthetically I don't want this. We'll see
 // function useDragPiece(view: RefObject<SVGElement>) {
@@ -46,14 +52,7 @@ namespace Game {
   }
 
   export function useGame() {
-    const { stream, defaultState } = useContext(StateContext);
-    const [{ automaton }, setLocal] = useState(() => getGame(defaultState));
-
-    useEffect(() => {
-      stream.pipe(map(getGame)).subscribe({
-        next: setLocal,
-      });
-    }, [stream]);
+    const { automaton } = useGameState(getGame);
 
     return {
       automaton,
@@ -150,24 +149,107 @@ function ConnectionIndicator({ from, to }: { from: Hex.T; to: Hex.T }) {
   );
 }
 
-// const Connections = memo(function Connections() {
-//   const connections = Board.useConnections();
-//   const automaton = Board.usePiece("piece-automaton");
+function Interactions({
+  interactions,
+}: {
+  interactions: Record<Piece.InteractionId, Piece.Interaction>;
+}) {
+  const setState = useSetGameState();
+  const automaton = useGameState(useCallback((state) => state.automaton, []));
 
-//   return (
-//     <>
-//       {connections.language.map((piece) => (
-//         <ConnectionIndicator from={automaton.hex} to={piece.hex} />
-//       ))}
-//     </>
-//   );
-// });
+  const interactionList = useGameStreamState(
+    useCallback(
+      (stream) =>
+        stream.pipe(
+          map(({ board: { pieces }, automaton: { language_alltime } }) =>
+            Object.values(interactions).filter((int) => {
+              assert(int.owner in pieces, {
+                interaction: int,
+                pieces,
+              });
+              return (
+                !pieces[int.owner].interactionsCompleted[int.id] &&
+                (1 / 10) * int.cost.language < language_alltime
+              );
+            })
+          )
+        ),
+      []
+    ),
+    []
+  );
+
+  const interaction = useCallback(
+    (int: Piece.Interaction) =>
+      setState(
+        pipeM(
+          set(
+            lensPath([
+              "board",
+              "pieces",
+              int.owner,
+              "interactionsCompleted",
+              int.id,
+            ]),
+            true
+          ),
+          over(lensPath(["automaton", "language"]), add(-int.cost.language))
+        )
+      ),
+    []
+  );
+
+  return (
+    <ul>
+      {interactionList.map((int) => (
+        <li key={int.id}>
+          <button
+            title={int.flavor_text}
+            disabled={int.cost.language > automaton.language}
+            onClick={() => interaction(int)}
+          >
+            <div>{int.name}</div>
+            <div>{int.cost.language}</div>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Description({ selectedPiece }: { selectedPiece: Piece.WithHex }) {
+  const config = usePieceConfig(selectedPiece?.id);
+  if (!config) return null;
+  return (
+    <>
+      {config && <p>{config.description}</p>}
+      <Interactions interactions={config.interactions} />
+    </>
+  );
+}
 
 function SelectionWindow() {
   const { automaton } = Game.useGame();
+  const selectedPiece = useSelectedPiece();
+
   return (
-    <div style={{ position: "absolute" }}>
-      <section>Acquired language: {automaton.language}</section>
+    <div
+      style={{
+        position: "absolute",
+      }}
+    >
+      <div class="card">
+        <section>Acquired language: {automaton.language}</section>
+      </div>
+
+      {selectedPiece && (
+        <div class="card">
+          <section>
+            <h3>{selectedPiece.id}</h3>
+            <Description selectedPiece={selectedPiece} />
+          </section>
+        </div>
+      )}
     </div>
   );
 }

@@ -75,6 +75,10 @@ export function fromEntries<K extends string, T>(entries: [K, T][]) {
   return Object.fromEntries(entries) as Record<K, T>;
 }
 
+export function fromIdArray<K extends string, T extends { id: K }>(ts: T[]) {
+  return fromEntries(ts.map((t) => [t.id, t]));
+}
+
 export function useChangedDebug(name: string, values: Record<string, any>) {
   const prior = useRef<Record<string, any>>(values);
   useEffect(() => {
@@ -102,4 +106,15 @@ export function useChangedDebug(name: string, values: Record<string, any>) {
 
     prior.current = values;
   }, Object.values(values));
+}
+
+export function formatted([s]: TemplateStringsArray) {
+  return s.trim().replace(/\n+/g, (s) => {
+    switch (s.length) {
+      case 1:
+        return " ";
+      default:
+        return "\n";
+    }
+  });
 }

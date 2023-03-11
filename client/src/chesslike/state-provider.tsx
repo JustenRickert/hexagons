@@ -1,23 +1,29 @@
 import { ComponentChildren, createContext } from "preact";
-import { useCallback, useEffect, useMemo } from "preact/hooks";
+import { useContext, useEffect, useMemo, useState } from "preact/hooks";
 import {
   distinctUntilChanged,
   EMPTY,
   merge,
   Observable,
   Subject,
-  Subscription,
+  filter,
 } from "rxjs";
 import * as State from "./state";
 
-export const StateContext = createContext<{
+interface T {
   stream: Observable<State.T>;
   setState: (reducer: (state: State.T) => State.T) => void;
-  defaultState: State.T;
-}>({
+  getState: () => State.T;
+  // defaultState: State.T;
+  // latestWith: <S>(selector: (state: State.T) => S) => Observable<S>;
+}
+
+export const StateContext = createContext<T>({
   stream: EMPTY,
   setState: () => {},
-  defaultState: State.defaultState,
+  getState: () => State.defaultState,
+  // defaultState: State.defaultState,
+  // latestWith: () => EMPTY,
 });
 
 let state = State.defaultState;
@@ -26,15 +32,16 @@ const stateSubject = new Subject<State.T>();
 
 const stream = stateSubject.asObservable();
 
-export function StateProvider({ children }: { children: ComponentChildren }) {
-  const setState = useCallback<(reducer: (state: State.T) => State.T) => void>(
-    (reducer) => {
-      state = reducer(state);
-      stateSubject.next(state);
-    },
-    []
-  );
+function setState(reducer: (state: State.T) => State.T) {
+  state = reducer(state);
+  stateSubject.next(state);
+}
 
+function getState() {
+  return state;
+}
+
+export function StateProvider({ children }: { children: ComponentChildren }) {
   useEffect(() => {
     const sub = merge(
       ...State.effects.map((effect) =>
@@ -47,13 +54,17 @@ export function StateProvider({ children }: { children: ComponentChildren }) {
     });
 
     return () => sub.unsubscribe();
-  }, [setState]);
+  }, []);
 
-  const value = useMemo(
+  const value = useMemo<T>(
     () => ({
-      stream: stream,
+      stream,
       setState,
-      defaultState: State.defaultState,
+      getState,
+      // defaultState: State.defaultState,
+      // latestWith: function latestWith(selector) {
+      //   return stream.pipe(map(selector), distinctUntilChanged());
+      // },
     }),
     []
   );
@@ -61,4 +72,36 @@ export function StateProvider({ children }: { children: ComponentChildren }) {
   return (
     <StateContext.Provider value={value}>{children}</StateContext.Provider>
   );
+}
+
+export function useGameState<S>(
+  selector: (s: State.T) => S,
+  options?: {
+    filter?: (s: State.T) => boolean;
+    distinct?: (s1: State.T, s2: State.T) => boolean;
+  }
+) {
+  const { stream, getState } = useContext(StateContext);
+
+  const [local, setLocal] = useState<S>(() => selector(getState()));
+
+  useEffect(() => {
+    const sub = stream
+      .pipe(
+        filter(options?.filter ?? (() => true)),
+        distinctUntilChanged(options?.distinct)
+      )
+      .subscribe({
+        next(state) {
+          setLocal(selector(state));
+        },
+      });
+    return () => sub.unsubscribe();
+  }, [selector, stream]);
+
+  return local;
+}
+
+export function useSetGameState() {
+  return setState;
 }

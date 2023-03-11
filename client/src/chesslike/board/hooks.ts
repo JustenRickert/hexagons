@@ -15,16 +15,16 @@ import {
   set,
   when,
 } from "ramda";
-import { distinctUntilChanged, map } from "rxjs";
+import { Observable } from "rxjs";
 
 import { Axial, Hex } from "../../grid";
 import { assert, pipeM } from "../../util";
 
 import { SELECTED_HEX_COLOR, UNSELECTED_HEX_COLOR } from "../constants";
 import * as State from "../state";
-import { StateContext } from "../state-provider";
+import { StateContext, useGameState } from "../state-provider";
 import { Board, Piece } from "../types";
-import { fromEntries, truthy, useLatest } from "../util";
+import { fromEntries, truthy } from "../util";
 
 function equalsAtKeys<O extends {}>(fields: (keyof O)[], o1: O, o2: O) {
   return fields.every((k) => o1[k] === o2[k]);
@@ -74,7 +74,10 @@ export function neighbors(dist: number, piece: Piece.T, board: T) {
   );
 }
 
-function toPiece(pieceId: Piece.Id, state: Pick<State.T, "board">) {
+function toPiece(
+  pieceId: Piece.Id,
+  state: Pick<State.T, "board">
+): Piece.WithHex {
   const { board } = state;
   const piece = board.pieces[pieceId];
   assert(piece);
@@ -84,7 +87,7 @@ function toPiece(pieceId: Piece.Id, state: Pick<State.T, "board">) {
   };
 }
 
-function toPieces(state: State.T) {
+function toPieces(state: { board: State.T["board"] }) {
   const {
     board: { pieces },
   } = state;
@@ -94,24 +97,14 @@ function toPieces(state: State.T) {
 }
 
 export function usePieces() {
-  const { stream, defaultState } = useContext(StateContext);
-  return useLatest(
-    stream.pipe(
-      distinctUntilChanged((s1, s2) => equalsAtKeys(["board"], s1, s2)),
-      map(toPieces)
-    ),
-    () => toPieces(defaultState)
-  );
+  return useGameState(toPieces, {
+    distinct: (s1, s2) => s1.board.pieces === s2.board.pieces,
+  });
 }
 
 export function usePiece(pieceId: Piece.Id) {
-  const { stream, defaultState } = useContext(StateContext);
-  return useLatest(
-    stream.pipe(
-      map((state) => toPiece(pieceId, state)),
-      distinctUntilChanged(shallowEquals)
-    ),
-    () => toPiece(pieceId, defaultState)
+  return useGameState(
+    useCallback((state) => toPiece(pieceId, state), [pieceId])
   );
 }
 
@@ -128,13 +121,44 @@ function getBoardState(state: State.T) {
   };
 }
 
-export function useBoard() {
-  const { stream, setState, defaultState } = useContext(StateContext);
+function getSelectedPiece({ board }: Pick<State.T, "board">) {
+  return board.selectedPieceId
+    ? toPiece(board.selectedPieceId, { board })
+    : null;
+}
 
-  const { board, pieceSelected } = useLatest(
-    stream.pipe(map(getBoardState)),
-    () => getBoardState(defaultState)
+export function useStreamState<T>(stream: Observable<T>, defaultValue: T) {
+  const [state, setState] = useState<T>(defaultValue);
+
+  useEffect(() => {
+    const sub = stream.subscribe({
+      next: setState,
+    });
+    return () => sub.unsubscribe();
+  }, [stream]);
+
+  return state;
+}
+
+export function useGameStreamState<T>(
+  xf: (stream: Observable<State.T>) => Observable<T>,
+  defaultValue: T
+) {
+  const { stream } = useContext(StateContext);
+  return useStreamState(
+    useMemo(() => xf(stream), [stream, xf]),
+    defaultValue
   );
+}
+
+export function useSelectedPiece() {
+  return useGameState(getSelectedPiece);
+}
+
+export function useBoard() {
+  const { setState } = useContext(StateContext);
+  const selectedPiece = useSelectedPiece();
+  const { board } = useGameState(getBoardState);
 
   const setBoard = useCallback(
     (reducer: (state: T) => T) => setState(over(lensProp("board"), reducer)),
@@ -154,7 +178,7 @@ export function useBoard() {
   return {
     board,
 
-    pieceSelected,
+    selectedPiece,
 
     selectPiece: useCallback(
       (piece: Piece.T) => {
@@ -165,8 +189,8 @@ export function useBoard() {
 
         const selectNewHex = pipeM<T>(
           when(
-            () => Boolean(pieceSelected),
-            (b) => highlightHex(pieceSelected!.hexId, false, b)
+            () => Boolean(selectedPiece),
+            (b) => highlightHex(selectedPiece!.hexId, false, b)
           ),
           (b) => highlightHex(piece.hexId, true, b),
           set(lensProp("selectedPieceId"), piece.id)
@@ -180,21 +204,21 @@ export function useBoard() {
           )
         );
       },
-      [pieceSelected, highlightHex]
+      [selectedPiece, highlightHex]
     ),
 
     moveSelectedPiece: useCallback(
       (hex: Hex.T) => {
-        if (!pieceSelected) return;
+        if (!selectedPiece) return;
         setBoard(
           pipeM(
-            (b) => highlightHex(pieceSelected.hexId, false, b),
-            set(lensPath(["pieces", pieceSelected.id, "hexId"]), hex.id),
+            (b) => highlightHex(selectedPiece!.hexId, false, b),
+            set(lensPath(["pieces", selectedPiece.id, "hexId"]), hex.id),
             set(lensProp("selectedPieceId"), "")
           )
         );
       },
-      [pieceSelected]
+      [selectedPiece, setBoard]
     ),
   };
 }
@@ -214,21 +238,9 @@ function getHex(hexId: Hex.Id, state: State.T) {
 }
 
 export function useHex(hexId: Hex.Id) {
-  const { stream, defaultState } = useContext(StateContext);
-  const [{ hex, selected }, setLocal] = useState(() =>
-    getHex(hexId, defaultState)
+  const { hex, selected } = useGameState(
+    useCallback((state) => getHex(hexId, state), [hexId])
   );
-
-  useEffect(() => {
-    stream
-      .pipe(
-        map((state) => getHex(hexId, state)),
-        distinctUntilChanged(shallowEquals)
-      )
-      .subscribe({
-        next: setLocal,
-      });
-  }, [stream, hexId]);
 
   return {
     hex,
@@ -237,42 +249,31 @@ export function useHex(hexId: Hex.Id) {
 }
 
 export function usePieceConnection(pieceId: Piece.Id) {
-  const { stream, defaultState } = useContext(StateContext);
-
-  const toLanguageConnection = (state: State.T) => {
-    const automaton = toPiece("piece-automaton", state);
-    const piece = toPiece(pieceId, state);
-    return piece.gives.language &&
-      Axial.distance(automaton.hex.pos, piece.hex.pos) <= 1
-      ? piece.gives.language
-      : 0;
-  };
-
-  const languageConnection = useLatest(
-    stream.pipe(map((state) => toLanguageConnection(state))),
-    () => toLanguageConnection(defaultState)
+  const toLanguageConnection = useCallback(
+    (state: State.T) => {
+      const automaton = toPiece("piece-automaton", state);
+      const piece = toPiece(pieceId, state);
+      return piece.gives.language &&
+        Axial.distance(automaton.hex.pos, piece.hex.pos) <= 1
+        ? piece.gives.language
+        : 0;
+    },
+    [pieceId]
   );
 
   return {
-    language: languageConnection,
+    language: useGameState(toLanguageConnection),
   };
 }
 
 function toConnection(state: Pick<State.T, "board">) {
-  return State.givesLanguage({ board: state.board }).map((piece) =>
+  return State.neighborsGivesLanguage({ board: state.board }).map((piece) =>
     toPiece(piece.id, state)
   );
 }
 
 export function useConnections() {
-  const { stream, defaultState } = useContext(StateContext);
-  const languageConnections = useLatest(
-    stream.pipe(
-      distinctUntilChanged((s1, s2) => equalsAtKeys(["board"], s1, s2)),
-      map((state) => toConnection({ board: state.board }))
-    ),
-    () => toConnection(defaultState)
-  );
+  const languageConnections = useGameState(toConnection);
   return useMemo(
     () => ({
       language: languageConnections,

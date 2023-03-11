@@ -1,3 +1,5 @@
+import { last } from "ramda";
+
 export function assert(condition: any, ...msgs: any[]): asserts condition {
   if (!condition) {
     console.error(...msgs);
@@ -55,3 +57,10 @@ export function thru<T>(t: T, ...xfs: ((t: T) => T)[]) {
 export function pipeM<T>(...xfs: ((t: T) => T)[]) {
   return (t: T) => xfs.reduce((t, xf) => xf(t), t);
 }
+
+// export function filename() {
+//   const url = new URL(import.meta.url);
+//   const fname = last(url.pathname.split("/"));
+//   assert(fname);
+//   return fname;
+// }
