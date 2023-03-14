@@ -6,7 +6,7 @@ const pieceConfigs = import.meta.glob("../pieces/piece-*.ts", { eager: true });
 interface PieceConfig {
   id: Piece.Id;
   description: string;
-  gives: Piece.T["gives"];
+  gives: Piece.T["baseGives"];
   interactions: Record<Piece.InteractionId, Piece.Interaction>;
   strayMovement: boolean;
   svg: string;

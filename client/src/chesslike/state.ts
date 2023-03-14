@@ -1,4 +1,4 @@
-import { add, lensPath, over, pick, set } from "ramda";
+import { add, lensPath, over, set } from "ramda";
 import { distinct, from, map, mergeMap, Observable } from "rxjs";
 
 import { Axial, Hex } from "../grid";
@@ -10,7 +10,7 @@ import {
   getPieceInteractionConfig,
 } from "./board/piece-config";
 import { Automaton, Board, Piece, State } from "./types";
-import { interval } from "./util";
+import { fromEntries, interval } from "./util";
 
 export type T = State.T;
 
@@ -20,7 +20,12 @@ const defaultHexes = [
 ].map(Hex.make);
 
 function fromConfig(id: Piece.Id) {
-  return pick(["id", "gives", "strayMovement"], getPieceConfig(id));
+  const c = getPieceConfig(id);
+  return {
+    baseGives: c.gives,
+    id: c.id,
+    strayMovement: c.strayMovement,
+  };
 }
 
 const defaultPieces: Piece.T[] = [
@@ -71,22 +76,64 @@ export function neighborsGivesLanguage({
   board,
 }: Pick<State.T, "board">): GivesLanguage<Piece.T>[] {
   return neighbors(1, board.pieces["piece-automaton"], board)
-    .filter((n) => n.piece?.gives.language)
+    .filter((n) => n.piece?.baseGives.language)
     .map((n) => n.piece! as GivesLanguage<Piece.T>);
 }
+
+function sumRecords<K extends string>(records: Record<K, number>[]) {
+  const ss: Record<string, number> = {};
+  for (const r of records)
+    for (const [k, n] of Util.entries(r)) {
+      if (!(k in ss)) ss[k] = 0;
+      ss[k] += n;
+    }
+  return ss;
+}
+
+export function pieceGives(pieceId: Piece.Id, state: State.T) {
+  const piece = state.board.pieces[pieceId];
+  const giveKeys: (keyof Piece.Gives)[] = ["language"];
+  const base = fromEntries(
+    giveKeys.map((key) => [key, piece.baseGives[key] ?? 0])
+  );
+
+  const interactions = Util.keys(piece.interactionsCompleted).map((intId) =>
+    getPieceInteractionConfig(pieceId, intId)
+  );
+
+  const bonus = fromEntries(
+    giveKeys.map((giveKey) => [
+      giveKey,
+      sumWith((int) => int.gives[giveKey] ?? 0, interactions),
+    ])
+  );
+
+  return {
+    base,
+    bonus,
+  };
+}
+
+// function givesN(pieceIds: Piece.Id[], state: State.T) {
+//   const eachGives = pieceIds.map((pieceId) => gives(pieceId, state));
+//   return {
+//     base: sumRecords(eachGives.map((gives) => gives.base)),
+//     bonus: sumRecords(eachGives.map((gives) => gives.bonus)),
+//   };
+// }
 
 export const effects: StateEffect[] = [
   function automatonLanguageGiving(_state$) {
     return interval(1e3).pipe(
       map(() => (state) => {
         const neighbors = neighborsGivesLanguage(state);
-        const language_base = sumWith((n) => n.gives.language, neighbors);
+        const language_base = sumWith((n) => n.baseGives.language, neighbors);
         if (!language_base) return state;
         const language_bonus = sumWith(
           (n) =>
             sumWith(
               (intId) =>
-                getPieceInteractionConfig(n.id, intId).adds.language ?? 0,
+                getPieceInteractionConfig(n.id, intId).gives.language ?? 0,
               Util.keys(n.interactionsCompleted)
             ),
           neighbors

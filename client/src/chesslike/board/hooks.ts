@@ -121,7 +121,7 @@ function getBoardState(state: State.T) {
   };
 }
 
-function getSelectedPiece({ board }: Pick<State.T, "board">) {
+export function getSelectedPiece({ board }: Pick<State.T, "board">) {
   return board.selectedPieceId
     ? toPiece(board.selectedPieceId, { board })
     : null;
@@ -153,6 +153,15 @@ export function useGameStreamState<T>(
 
 export function useSelectedPiece() {
   return useGameState(getSelectedPiece);
+}
+
+export function usePieceGives(pieceId: "" | Piece.Id) {
+  return useGameState(
+    useCallback(
+      (state) => (pieceId ? State.pieceGives(pieceId, state) : null),
+      [pieceId]
+    )
+  );
 }
 
 export function useBoard() {
@@ -253,9 +262,9 @@ export function usePieceConnection(pieceId: Piece.Id) {
     (state: State.T) => {
       const automaton = toPiece("piece-automaton", state);
       const piece = toPiece(pieceId, state);
-      return piece.gives.language &&
+      return piece.baseGives.language &&
         Axial.distance(automaton.hex.pos, piece.hex.pos) <= 1
-        ? piece.gives.language
+        ? piece.baseGives.language
         : 0;
     },
     [pieceId]

@@ -21,7 +21,7 @@ export const interactions = fromIdArray<Piece.InteractionId, Piece.Interaction>(
         cost: {
           language: 10,
         },
-        adds: {
+        gives: {
           language: 1,
         },
         flavor_text: "Baby's first words",
@@ -32,7 +32,7 @@ export const interactions = fromIdArray<Piece.InteractionId, Piece.Interaction>(
         cost: {
           language: 1000,
         },
-        adds: {
+        gives: {
           language: 1,
         },
         flavor_text: "Ask mom about dad",

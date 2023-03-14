@@ -11,16 +11,20 @@ export namespace Piece {
     cost: {
       language?: number;
     };
-    adds: {
+    gives: {
       language?: number;
     };
     flavor_text: string;
   }
 
+  export interface Gives {
+    language?: number;
+  }
+
   export interface T {
     id: Id;
     hexId: Hex.Id;
-    gives: { language?: number };
+    baseGives: Piece.Gives;
     strayMovement: boolean;
     interactionsCompleted: Record<InteractionId, true | undefined>;
   }

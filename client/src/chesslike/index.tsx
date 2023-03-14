@@ -2,14 +2,14 @@ import "./index.css";
 
 import { useCallback, useEffect, useRef } from "preact/hooks";
 import { add, lensPath, over, set } from "ramda";
-import { map } from "rxjs";
 
 import { Axial, Hex } from "../grid";
 import { assert, pipeM } from "../util";
 
 import { GameBoard } from "./board/component";
-import { useGameStreamState, useSelectedPiece } from "./board/hooks";
+import { getSelectedPiece } from "./board/hooks";
 import { usePieceConfig } from "./board/piece-config";
+import { pieceGives } from "./state";
 import { useGameState, useSetGameState } from "./state-provider";
 import { Piece, State } from "./types";
 
@@ -157,26 +157,21 @@ function Interactions({
   const setState = useSetGameState();
   const automaton = useGameState(useCallback((state) => state.automaton, []));
 
-  const interactionList = useGameStreamState(
+  const interactionList = useGameState(
     useCallback(
-      (stream) =>
-        stream.pipe(
-          map(({ board: { pieces }, automaton: { language_alltime } }) =>
-            Object.values(interactions).filter((int) => {
-              assert(int.owner in pieces, {
-                interaction: int,
-                pieces,
-              });
-              return (
-                !pieces[int.owner].interactionsCompleted[int.id] &&
-                (1 / 10) * int.cost.language < language_alltime
-              );
-            })
-          )
-        ),
-      []
-    ),
-    []
+      ({ automaton: { language_alltime }, board: { pieces } }) =>
+        Object.values(interactions).filter((int) => {
+          assert(int.owner in pieces, {
+            interaction: int,
+            pieces,
+          });
+          return (
+            !pieces[int.owner].interactionsCompleted[int.id] &&
+            (1 / 10) * int.cost.language < language_alltime
+          );
+        }),
+      [interactions]
+    )
   );
 
   const interaction = useCallback(
@@ -228,9 +223,28 @@ function Description({ selectedPiece }: { selectedPiece: Piece.WithHex }) {
   );
 }
 
-function SelectionWindow() {
+function useSelectionWindowState() {
   const { automaton } = Game.useGame();
-  const selectedPiece = useSelectedPiece();
+  const selected = useGameState(
+    useCallback((state) => {
+      const selectedPiece = getSelectedPiece(state);
+      return (
+        selectedPiece && {
+          ...selectedPiece,
+          computedGives: pieceGives(selectedPiece.id, state),
+        }
+      );
+    }, [])
+  );
+
+  return {
+    automaton,
+    selected,
+  };
+}
+
+function SelectionWindow() {
+  const { automaton, selected } = useSelectionWindowState();
 
   return (
     <div
@@ -242,11 +256,14 @@ function SelectionWindow() {
         <section>Acquired language: {automaton.language}</section>
       </div>
 
-      {selectedPiece && (
+      {selected && (
         <div class="card">
           <section>
-            <h3>{selectedPiece.id}</h3>
-            <Description selectedPiece={selectedPiece} />
+            <h3>{selected.id}</h3>+~
+            {selected.computedGives.base.language +
+              selected.computedGives.bonus.language}{" "}
+            language/s
+            <Description selectedPiece={selected} />
           </section>
         </div>
       )}
