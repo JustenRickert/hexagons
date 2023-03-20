@@ -40,11 +40,11 @@ function shallowEquals<O extends {}>(o1: O, o2: O) {
 export type T = Board.T;
 
 function piecesRing(dist: number, piece: Piece.T, board: T) {
-  const hex = board.grid[piece.hexId];
+  const hex = board.grid[piece.hex_id];
   assert(hex);
   const pieces = Object.values(board.pieces);
   return Axial.ring(dist, hex.pos)
-    .map((pos) => pieces.find((p) => p.hexId === Axial.id(pos)))
+    .map((pos) => pieces.find((p) => p.hex_id === Axial.id(pos)))
     .filter(truthy);
 }
 
@@ -56,7 +56,7 @@ export function piecesNeighbors(piece: Piece.T, board: T) {
  * Everything within `dist` except `piece` itself
  */
 export function neighbors(dist: number, piece: Piece.T, board: T) {
-  const hex = board.grid[piece.hexId];
+  const hex = board.grid[piece.hex_id];
   const pieces = Object.values(board.pieces);
   return range(1, dist + 1).flatMap((dist) =>
     Axial.ring(dist, hex.pos)
@@ -68,7 +68,7 @@ export function neighbors(dist: number, piece: Piece.T, board: T) {
         const hexId = Axial.id(a);
         return {
           hex: board.grid[hexId],
-          piece: pieces.find((p) => p.hexId === hexId) ?? null,
+          piece: pieces.find((p) => p.hex_id === hexId) ?? null,
         };
       })
   );
@@ -83,7 +83,7 @@ function toPiece(
   assert(piece);
   return {
     ...piece,
-    hex: board.grid[piece.hexId],
+    hex: board.grid[piece.hex_id],
   };
 }
 
@@ -192,16 +192,16 @@ export function useBoard() {
     selectPiece: useCallback(
       (piece: Piece.T) => {
         const toggleSelected = pipeM<T>(
-          (b) => highlightHex(piece.hexId, false, b),
+          (b) => highlightHex(piece.hex_id, false, b),
           set(lensProp("selectedPieceId"), "")
         );
 
         const selectNewHex = pipeM<T>(
           when(
             () => Boolean(selectedPiece),
-            (b) => highlightHex(selectedPiece!.hexId, false, b)
+            (b) => highlightHex(selectedPiece!.hex_id, false, b)
           ),
-          (b) => highlightHex(piece.hexId, true, b),
+          (b) => highlightHex(piece.hex_id, true, b),
           set(lensProp("selectedPieceId"), piece.id)
         );
 
@@ -221,8 +221,8 @@ export function useBoard() {
         if (!selectedPiece) return;
         setBoard(
           pipeM(
-            (b) => highlightHex(selectedPiece!.hexId, false, b),
-            set(lensPath(["pieces", selectedPiece.id, "hexId"]), hex.id),
+            (b) => highlightHex(selectedPiece!.hex_id, false, b),
+            set(lensPath(["pieces", selectedPiece.id, "hex_id"]), hex.id),
             set(lensProp("selectedPieceId"), "")
           )
         );
@@ -238,7 +238,7 @@ function getHex(hexId: Hex.Id, state: State.T) {
   } = state;
   const hex = grid[hexId];
   const selected = Boolean(
-    selectedPieceId && hexId === pieces[selectedPieceId].hexId
+    selectedPieceId && hexId === pieces[selectedPieceId].hex_id
   );
   return {
     hex,
@@ -262,9 +262,9 @@ export function usePieceConnection(pieceId: Piece.Id) {
     (state: State.T) => {
       const automaton = toPiece("piece-automaton", state);
       const piece = toPiece(pieceId, state);
-      return piece.baseGives.language &&
+      return piece.base_gives.language &&
         Axial.distance(automaton.hex.pos, piece.hex.pos) <= 1
-        ? piece.baseGives.language
+        ? piece.base_gives.language
         : 0;
     },
     [pieceId]
@@ -298,7 +298,7 @@ export function useBoardPiece(pieceId: Piece.Id) {
   return useMemo(() => {
     return {
       ...piece,
-      pos: board.grid[piece.hexId].pos,
+      pos: board.grid[piece.hex_id].pos,
     };
   }, [piece, board]);
 }

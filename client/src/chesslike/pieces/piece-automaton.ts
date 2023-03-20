@@ -1,14 +1,15 @@
-import { Piece } from "../types";
-import svgpath from "../svg-assets/automaton.svg";
+import { PieceConfig } from "../types";
+import IMAGE_PATH from "../svg-assets/automaton.svg";
 
-export const id: Piece.Id = "piece-automaton";
+const CONFIG: PieceConfig = {
+  id: "piece-automaton",
+  name: "The automaton",
+  unlocked: false,
+  description: "The robot",
+  gives: {},
+  interactions: [],
+  stray_movement: false,
+  image_path: IMAGE_PATH,
+};
 
-export const description = "The robot";
-
-export const strayMovement = false;
-
-export const gives = {};
-
-export const interactions = {};
-
-export const svg = svgpath;
+export default CONFIG;

@@ -1,32 +1,56 @@
 import { Hex } from "../grid";
 
+export interface PieceInteractionConfig {
+  id: Piece.InteractionId;
+  name: string;
+  cost: Partial<Piece.Gives>;
+  gives: Partial<Piece.Gives>;
+  flavor_text: string;
+  unlocked?: boolean;
+  unlocks?: Piece.InteractionUnlock[];
+}
+
+export interface PieceConfig {
+  id: Piece.Id;
+  name: string;
+  description: string;
+  interactions: PieceInteractionConfig[];
+  gives: Partial<Piece.Gives>;
+  stray_movement: boolean;
+  unlocked: boolean;
+  image_path?: string;
+}
+
 export namespace Piece {
   export type Id = `piece-${string}`;
   export type InteractionId = `interaction-${string}`;
 
-  export interface Interaction {
+  export interface InteractionUnlock {
+    type: "interaction";
     id: InteractionId;
     owner: Piece.Id;
-    name: string;
-    cost: {
-      language?: number;
-    };
-    gives: {
-      language?: number;
-    };
-    flavor_text: string;
   }
 
   export interface Gives {
-    language?: number;
+    language: number;
+    mathematics: number;
+  }
+
+  export interface Interaction {
+    id: InteractionId;
+    owner: Piece.Id;
+    base_gives: Piece.Gives;
+    unlocked: boolean;
+    unlocks: InteractionUnlock[];
   }
 
   export interface T {
     id: Id;
-    hexId: Hex.Id;
-    baseGives: Piece.Gives;
-    strayMovement: boolean;
-    interactionsCompleted: Record<InteractionId, true | undefined>;
+    hex_id: Hex.Id;
+    base_gives: Piece.Gives;
+    stray_movement: boolean;
+    interactions_completed: Record<InteractionId, true | undefined>;
+    image_path: string;
   }
 
   export type WithHex = T & { hex: Hex.T };
@@ -42,8 +66,14 @@ export namespace Board {
 
 export namespace Automaton {
   export interface T {
-    language: number;
-    language_alltime: number;
+    language: {
+      current: number;
+      alltime: number;
+    };
+    mathematics: {
+      current: number;
+      alltime: number;
+    };
   }
 }
 

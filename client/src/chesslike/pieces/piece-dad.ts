@@ -1,13 +1,17 @@
-import { Piece } from "../types";
+import { PieceConfig } from "../types";
 
-export const id: Piece.Id = "piece-dad";
+export const INTERACTIONS = [];
 
-export const description = "The automaton's father";
-
-export const strayMovement = true;
-
-export const gives = {
-  language: 1,
+const CONFIG: PieceConfig = {
+  id: "piece-dad",
+  name: "Dad",
+  description: "The automaton's father",
+  gives: {
+    language: 1,
+  },
+  stray_movement: true,
+  unlocked: true,
+  interactions: INTERACTIONS,
 };
 
-export const interactions = {};
+export default CONFIG;

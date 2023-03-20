@@ -1,6 +1,6 @@
 import "./component.css";
 
-import { JSX, memo } from "preact/compat";
+import { memo } from "preact/compat";
 import { useCallback, useRef } from "preact/hooks";
 
 import { Axial, Hex } from "../../grid";
@@ -15,7 +15,6 @@ import {
   usePieceConnection,
   useSelectedPiece,
 } from "./hooks";
-import { getPieceConfig } from "./piece-config";
 
 const HexGridHex = memo(function HexGridHex({
   hexId,
@@ -70,77 +69,21 @@ function classes(cs: Record<string, boolean>) {
 
 function PieceSvg({ piece }: { piece: Piece.T }) {
   const { pos } = useBoardPiece(piece.id);
-  // let el: JSX.Element;
 
   const connection = usePieceConnection(piece.id);
 
   const borderColor = connection.language ? "lightblue" : "black";
 
-  // const pulseBorder = <animate attributeName="strokeWidth"></animate>
-
-  const { svg } = getPieceConfig(piece.id);
-
-  // TODO css classes don't apply to image svgs. I think probably should move
-  // the coloring to the hex behind the piece svg maybe. Dunno just spit-balling
-  const el = svg ? (
+  const el = (
     <image
       style={{
         transform: "translate(-50px, -50px)",
       }}
       height={100}
       width={100}
-      href={svg}
-    />
-  ) : (
-    <circle
-      class={classes({
-        "language-connection": Boolean(connection.language),
-      })}
-      r={50}
-      cx={0}
-      cy={0}
+      href={piece.image_path}
     />
   );
-
-  // switch (piece.id) {
-  //   case "piece-automaton":
-  //     const { svg } = getPieceConfig(piece.id);
-  //     el = (
-  //       <image
-  //         style={{
-  //           transform: "translate(-50px, -50px)",
-  //         }}
-  //         height={100}
-  //         width={100}
-  //         href={svg}
-  //       />
-  //     );
-  //     break;
-  //   case "piece-mom":
-  //     el = (
-  //       <polygon
-  //         class={classes({
-  //           "language-connection": Boolean(connection.language),
-  //         })}
-  //         points="0,-34 34,0 0,34 -34,0"
-  //       />
-  //     );
-  //     break;
-  //   case "piece-dad":
-  //     el = (
-  //       <polygon
-  //         class={classes({
-  //           "language-connection": Boolean(connection.language),
-  //         })}
-  //         stroke={borderColor}
-  //         points="-25,-25 25,-25 25,25 -25,25"
-  //       />
-  //     );
-  //     break;
-  //   default:
-  //     console.error("id `%s` not found", piece.id);
-  //     throw new Error();
-  // }
 
   return (
     <g
@@ -169,12 +112,13 @@ export function GameBoard() {
 
   const handleSelectHex = useCallback<(h: Hex.T) => void>(
     (hex) => {
-      const pieceAtHex = Object.values(pieces).find((p) => p.hexId === hex.id);
-      if (pieceSelected && pieceSelected.hexId !== hex.id) {
+      const pieceAtHex = Object.values(pieces).find((p) => p.hex_id === hex.id);
+      if (pieceSelected && pieceSelected.hex_id !== hex.id) {
         if (!pieceAtHex) {
           console.log("moving?", { hex, pieceSelected });
           moveSelectedPiece(hex);
         }
+
         return;
       }
       if (!pieceAtHex) return;

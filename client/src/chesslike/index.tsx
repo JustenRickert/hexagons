@@ -8,7 +8,11 @@ import { assert, pipeM } from "../util";
 
 import { GameBoard } from "./board/component";
 import { getSelectedPiece } from "./board/hooks";
-import { usePieceConfig } from "./board/piece-config";
+import {
+  getPieceInteractionConfig,
+  usePieceConfig,
+  usePieceInteractions,
+} from "./pieces";
 import { pieceGives } from "./state";
 import { useGameState, useSetGameState } from "./state-provider";
 import { Piece, State } from "./types";
@@ -149,32 +153,37 @@ function ConnectionIndicator({ from, to }: { from: Hex.T; to: Hex.T }) {
   );
 }
 
-function Interactions({
-  interactions,
-}: {
-  interactions: Record<Piece.InteractionId, Piece.Interaction>;
-}) {
+function Interactions({ interactions }: { interactions: Piece.Interaction[] }) {
   const setState = useSetGameState();
   const automaton = useGameState(useCallback((state) => state.automaton, []));
 
   const interactionList = useGameState(
     useCallback(
-      ({ automaton: { language_alltime }, board: { pieces } }) =>
-        Object.values(interactions).filter((int) => {
-          assert(int.owner in pieces, {
-            interaction: int,
-            pieces,
-          });
-          return (
-            !pieces[int.owner].interactionsCompleted[int.id] &&
-            (1 / 10) * int.cost.language < language_alltime
-          );
-        }),
+      ({ automaton: { language }, board: { pieces } }) =>
+        interactions
+          .map((int) => {
+            assert(int.owner in pieces, {
+              interaction: int,
+              pieces,
+            });
+            return {
+              int,
+              config: getPieceInteractionConfig(int.owner, int.id),
+            };
+          })
+          .filter(({ int, config }) => {
+            const alreadyCompleted = Boolean(
+              pieces[int.owner].interactions_completed[int.id]
+            );
+            const metCost =
+              (1 / 10) * (config.cost.language ?? 0) < language.alltime;
+            return !alreadyCompleted && metCost;
+          }),
       [interactions]
     )
   );
 
-  const interaction = useCallback(
+  const doInteraction = useCallback(
     (int: Piece.Interaction) =>
       setState(
         pipeM(
@@ -183,12 +192,19 @@ function Interactions({
               "board",
               "pieces",
               int.owner,
-              "interactionsCompleted",
+              "interactions_completed",
               int.id,
             ]),
             true
           ),
-          over(lensPath(["automaton", "language"]), add(-int.cost.language))
+          (state) => {
+            const config = getPieceInteractionConfig(int.owner, int.id);
+            return over(
+              lensPath(["automaton", "language", "current"]),
+              add(-(config.cost?.language ?? 0)),
+              state
+            );
+          }
         )
       ),
     []
@@ -196,15 +212,19 @@ function Interactions({
 
   return (
     <ul>
-      {interactionList.map((int) => (
+      {interactionList.map(({ int, config }) => (
         <li key={int.id}>
           <button
-            title={int.flavor_text}
-            disabled={int.cost.language > automaton.language}
-            onClick={() => interaction(int)}
+            title={config.flavor_text}
+            disabled={
+              (config.cost.language ?? 0) > automaton.language.current ||
+              (config.cost.mathematics ?? 0) > automaton.mathematics.current
+            }
+            onClick={() => doInteraction(int)}
           >
-            <div>{int.name}</div>
-            <div>{int.cost.language}</div>
+            <div>{config.name}</div>
+            {config.cost.language && <div>{config.cost.language}L</div>}
+            {config.cost.mathematics && <div>{config.cost.mathematics}M</div>}
           </button>
         </li>
       ))}
@@ -214,11 +234,12 @@ function Interactions({
 
 function Description({ selectedPiece }: { selectedPiece: Piece.WithHex }) {
   const config = usePieceConfig(selectedPiece?.id);
-  if (!config) return null;
+  const interactions = usePieceInteractions(selectedPiece?.id);
+  if (!config || !interactions) return null;
   return (
     <>
-      {config && <p>{config.description}</p>}
-      <Interactions interactions={config.interactions} />
+      <p>{config.description}</p>
+      <Interactions interactions={interactions} />
     </>
   );
 }
@@ -253,7 +274,7 @@ function SelectionWindow() {
       }}
     >
       <div class="card">
-        <section>Acquired language: {automaton.language}</section>
+        <section>Acquired language: {automaton.language.current}</section>
       </div>
 
       {selected && (

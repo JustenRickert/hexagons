@@ -5,10 +5,7 @@ import { Axial, Hex } from "../grid";
 import * as Util from "../util";
 
 import { neighbors } from "./board/hooks";
-import {
-  getPieceConfig,
-  getPieceInteractionConfig,
-} from "./board/piece-config";
+import { getPieceConfig, getPieceInteractionConfig } from "./pieces";
 import { Automaton, Board, Piece, State } from "./types";
 import { fromEntries, interval } from "./util";
 
@@ -22,9 +19,15 @@ const defaultHexes = [
 function fromConfig(id: Piece.Id) {
   const c = getPieceConfig(id);
   return {
-    baseGives: c.gives,
+    base_gives: {
+      language: 0,
+      mathematics: 0,
+      ...c.gives,
+    },
     id: c.id,
-    strayMovement: c.strayMovement,
+    stray_movement: c.stray_movement,
+    interactions_completed: {},
+    image_path: c.image_path ?? "../svg-assets/mom.svg",
   };
 }
 
@@ -34,8 +37,7 @@ const defaultPieces: Piece.T[] = [
   fromConfig("piece-dad"),
 ].map((piece, i) => ({
   ...piece,
-  hexId: defaultHexes[i].id,
-  interactionsCompleted: {},
+  hex_id: defaultHexes[i].id,
 }));
 
 export function makeBoard(): Board.T {
@@ -48,8 +50,14 @@ export function makeBoard(): Board.T {
 
 function makeAutomaton(): Automaton.T {
   return {
-    language: 0,
-    language_alltime: 0,
+    language: {
+      current: 0,
+      alltime: 0,
+    },
+    mathematics: {
+      current: 0,
+      alltime: 0,
+    },
   };
 }
 
@@ -75,8 +83,9 @@ type GivesLanguage<T> = T & { gives: { language: number } };
 export function neighborsGivesLanguage({
   board,
 }: Pick<State.T, "board">): GivesLanguage<Piece.T>[] {
+  console.log(board);
   return neighbors(1, board.pieces["piece-automaton"], board)
-    .filter((n) => n.piece?.baseGives.language)
+    .filter((n) => n.piece?.base_gives.language)
     .map((n) => n.piece! as GivesLanguage<Piece.T>);
 }
 
@@ -94,10 +103,10 @@ export function pieceGives(pieceId: Piece.Id, state: State.T) {
   const piece = state.board.pieces[pieceId];
   const giveKeys: (keyof Piece.Gives)[] = ["language"];
   const base = fromEntries(
-    giveKeys.map((key) => [key, piece.baseGives[key] ?? 0])
+    giveKeys.map((key) => [key, piece.base_gives[key] ?? 0])
   );
 
-  const interactions = Util.keys(piece.interactionsCompleted).map((intId) =>
+  const interactions = Util.keys(piece.interactions_completed).map((intId) =>
     getPieceInteractionConfig(pieceId, intId)
   );
 
@@ -127,21 +136,27 @@ export const effects: StateEffect[] = [
     return interval(1e3).pipe(
       map(() => (state) => {
         const neighbors = neighborsGivesLanguage(state);
-        const language_base = sumWith((n) => n.baseGives.language, neighbors);
+        const language_base = sumWith((n) => n.base_gives.language, neighbors);
         if (!language_base) return state;
         const language_bonus = sumWith(
           (n) =>
             sumWith(
               (intId) =>
                 getPieceInteractionConfig(n.id, intId).gives.language ?? 0,
-              Util.keys(n.interactionsCompleted)
+              Util.keys(n.interactions_completed)
             ),
           neighbors
         );
         const language_delta = language_base + language_bonus;
         const xf = Util.pipeM(
-          over(lensPath(["automaton", "language"]), add(language_delta)),
-          over(lensPath(["automaton", "language_alltime"]), add(language_delta))
+          over(
+            lensPath(["automaton", "language", "current"]),
+            add(language_delta)
+          ),
+          over(
+            lensPath(["automaton", "language", "alltime"]),
+            add(language_delta)
+          )
         );
         return xf(state);
       })
@@ -153,7 +168,7 @@ export const effects: StateEffect[] = [
       mergeMap((state) =>
         from(
           Util.keys(state.board.pieces).filter(
-            (pieceId) => state.board.pieces[pieceId].strayMovement
+            (pieceId) => state.board.pieces[pieceId].stray_movement
           )
         )
       ),
@@ -174,7 +189,7 @@ export const effects: StateEffect[] = [
         if (!possible.length) return state;
         const hex = Util.sample(possible).hex;
         return set(
-          lensPath(["board", "pieces", pieceId, "hexId"]),
+          lensPath(["board", "pieces", pieceId, "hex_id"]),
           hex.id,
           state
         );
