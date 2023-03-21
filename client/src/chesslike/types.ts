@@ -6,8 +6,7 @@ export interface PieceInteractionConfig {
   cost: Partial<Piece.Gives>;
   gives: Partial<Piece.Gives>;
   flavor_text: string;
-  unlocked?: boolean;
-  unlocks?: Piece.InteractionUnlock[];
+  requirements: Piece.InteractionRequirement[];
 }
 
 export interface PieceConfig {
@@ -25,6 +24,11 @@ export namespace Piece {
   export type Id = `piece-${string}`;
   export type InteractionId = `interaction-${string}`;
 
+  export interface InteractionRequirement {
+    id: InteractionId;
+    owner: Piece.Id;
+  }
+
   export interface InteractionUnlock {
     type: "interaction";
     id: InteractionId;
@@ -34,15 +38,13 @@ export namespace Piece {
   export interface Gives {
     language: number;
     mathematics: number;
+    music: number;
   }
 
-  export interface Interaction {
-    id: InteractionId;
+  export type Interaction = PieceInteractionConfig & {
     owner: Piece.Id;
-    base_gives: Piece.Gives;
-    unlocked: boolean;
-    unlocks: InteractionUnlock[];
-  }
+    gives: Piece.Gives;
+  };
 
   export interface T {
     id: Id;
@@ -71,6 +73,10 @@ export namespace Automaton {
       alltime: number;
     };
     mathematics: {
+      current: number;
+      alltime: number;
+    };
+    music: {
       current: number;
       alltime: number;
     };

@@ -1,5 +1,7 @@
+import { memoizeWith } from "ramda";
 import { assert } from "../../util";
 import { Piece, PieceConfig, PieceInteractionConfig } from "../types";
+import { PieceId } from "./constant";
 
 const pieceConfigs = import.meta.glob("../pieces/piece-*.ts", { eager: true });
 
@@ -33,22 +35,33 @@ export function getPieceConfig(pieceId: Piece.Id): PieceConfig {
   return record.default;
 }
 
-export function makePieceInteraction(
-  config: PieceInteractionConfig,
-  { pieceId }: { pieceId: Piece.Id }
-): Piece.Interaction {
-  return {
-    id: config.id,
-    owner: pieceId,
-    base_gives: {
-      language: 0,
-      mathematics: 0,
-      ...config.gives,
-    },
-    unlocked: config.unlocked ?? false,
-    unlocks: config.unlocks ?? [],
-  };
-}
+/**
+ * A bit funny to have a separation between `PieceInteraction` and
+ * `PieceInteractionConfig`. The idea is that a config should have sparse
+ * attributes, so they're easy to write, and then the non-config should have
+ * defaulted values so the interface is easy to use.
+ */
+
+export const getPieceInteraction_inner = memoizeWith<
+  (
+    pieceId: Piece.Id,
+    interactionConfig: PieceInteractionConfig
+  ) => Piece.Interaction
+>(
+  (pieceId, int) => `${pieceId}.${int.id}`,
+  (pieceId, int) => {
+    return {
+      owner: pieceId,
+      ...int,
+      gives: {
+        language: 0,
+        mathematics: 0,
+        music: 0,
+        ...int.gives,
+      },
+    };
+  }
+);
 
 export function getPieceInteractionConfig(
   pieceId: Piece.Id,
@@ -60,16 +73,26 @@ export function getPieceInteractionConfig(
   return int;
 }
 
-export function usePieceConfig(pieceId: Piece.Id | undefined) {
-  if (!pieceId) return null;
-  return getPieceConfig(pieceId);
-}
-
-export function usePieceInteractions(pieceId: Piece.Id | undefined) {
-  if (!pieceId) return null;
-  return getPieceConfig(pieceId).interactions.map((int) =>
-    makePieceInteraction(int, { pieceId })
+export function getPieceInteraction(
+  pieceId: PieceId,
+  interactionId: Piece.InteractionId
+) {
+  return getPieceInteraction_inner(
+    pieceId,
+    getPieceInteractionConfig(pieceId, interactionId)
   );
-
-  // usePieceConfig
 }
+
+export const getAllPieceInteractions = memoizeWith<
+  (piece: Piece.Id) => Piece.Interaction[]
+>(String, (pieceId) =>
+  getPieceConfig(pieceId).interactions.map((int) =>
+    getPieceInteraction_inner(pieceId, int)
+  )
+);
+
+// export function usePieceInteractions(pieceId: Piece.Id) {
+//   return getPieceConfig(pieceId).interactions.map((int) =>
+//     makePieceInteraction(pieceId, int)
+//   );
+// }

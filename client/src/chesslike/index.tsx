@@ -1,21 +1,15 @@
 import "./index.css";
 
 import { useCallback, useEffect, useRef } from "preact/hooks";
-import { add, lensPath, over, set } from "ramda";
 
 import { Axial, Hex } from "../grid";
-import { assert, pipeM } from "../util";
 
 import { GameBoard } from "./board/component";
 import { getSelectedPiece } from "./board/hooks";
-import {
-  getPieceInteractionConfig,
-  usePieceConfig,
-  usePieceInteractions,
-} from "./pieces";
-import { pieceGives } from "./state";
-import { useGameState, useSetGameState } from "./state-provider";
-import { Piece, State } from "./types";
+import { useGameState } from "./state-provider";
+import { PieceCard } from "./piece-card";
+import { State } from "./types";
+import { Icon } from "./svg-assets";
 
 // TODO I think aesthetically I don't want this. We'll see
 // function useDragPiece(view: RefObject<SVGElement>) {
@@ -153,110 +147,9 @@ function ConnectionIndicator({ from, to }: { from: Hex.T; to: Hex.T }) {
   );
 }
 
-function Interactions({ interactions }: { interactions: Piece.Interaction[] }) {
-  const setState = useSetGameState();
-  const automaton = useGameState(useCallback((state) => state.automaton, []));
-
-  const interactionList = useGameState(
-    useCallback(
-      ({ automaton: { language }, board: { pieces } }) =>
-        interactions
-          .map((int) => {
-            assert(int.owner in pieces, {
-              interaction: int,
-              pieces,
-            });
-            return {
-              int,
-              config: getPieceInteractionConfig(int.owner, int.id),
-            };
-          })
-          .filter(({ int, config }) => {
-            const alreadyCompleted = Boolean(
-              pieces[int.owner].interactions_completed[int.id]
-            );
-            const metCost =
-              (1 / 10) * (config.cost.language ?? 0) < language.alltime;
-            return !alreadyCompleted && metCost;
-          }),
-      [interactions]
-    )
-  );
-
-  const doInteraction = useCallback(
-    (int: Piece.Interaction) =>
-      setState(
-        pipeM(
-          set(
-            lensPath([
-              "board",
-              "pieces",
-              int.owner,
-              "interactions_completed",
-              int.id,
-            ]),
-            true
-          ),
-          (state) => {
-            const config = getPieceInteractionConfig(int.owner, int.id);
-            return over(
-              lensPath(["automaton", "language", "current"]),
-              add(-(config.cost?.language ?? 0)),
-              state
-            );
-          }
-        )
-      ),
-    []
-  );
-
-  return (
-    <ul>
-      {interactionList.map(({ int, config }) => (
-        <li key={int.id}>
-          <button
-            title={config.flavor_text}
-            disabled={
-              (config.cost.language ?? 0) > automaton.language.current ||
-              (config.cost.mathematics ?? 0) > automaton.mathematics.current
-            }
-            onClick={() => doInteraction(int)}
-          >
-            <div>{config.name}</div>
-            {config.cost.language && <div>{config.cost.language}L</div>}
-            {config.cost.mathematics && <div>{config.cost.mathematics}M</div>}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function Description({ selectedPiece }: { selectedPiece: Piece.WithHex }) {
-  const config = usePieceConfig(selectedPiece?.id);
-  const interactions = usePieceInteractions(selectedPiece?.id);
-  if (!config || !interactions) return null;
-  return (
-    <>
-      <p>{config.description}</p>
-      <Interactions interactions={interactions} />
-    </>
-  );
-}
-
 function useSelectionWindowState() {
   const { automaton } = Game.useGame();
-  const selected = useGameState(
-    useCallback((state) => {
-      const selectedPiece = getSelectedPiece(state);
-      return (
-        selectedPiece && {
-          ...selectedPiece,
-          computedGives: pieceGives(selectedPiece.id, state),
-        }
-      );
-    }, [])
-  );
+  const selected = useGameState(useCallback(getSelectedPiece, []));
 
   return {
     automaton,
@@ -267,6 +160,10 @@ function useSelectionWindowState() {
 function SelectionWindow() {
   const { automaton, selected } = useSelectionWindowState();
 
+  console.log({
+    automaton,
+  });
+
   return (
     <div
       style={{
@@ -274,20 +171,17 @@ function SelectionWindow() {
       }}
     >
       <div class="card">
-        <section>Acquired language: {automaton.language.current}</section>
+        <section>
+          <Icon type="language" />
+          {automaton.language.current}
+          <Icon type="music" />
+          {automaton.music.current}
+          <Icon type="mathematics" />
+          {automaton.mathematics.current}
+        </section>
       </div>
 
-      {selected && (
-        <div class="card">
-          <section>
-            <h3>{selected.id}</h3>+~
-            {selected.computedGives.base.language +
-              selected.computedGives.bonus.language}{" "}
-            language/s
-            <Description selectedPiece={selected} />
-          </section>
-        </div>
-      )}
+      {selected && <PieceCard piece={selected} />}
     </div>
   );
 }

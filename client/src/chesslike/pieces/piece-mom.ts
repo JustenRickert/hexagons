@@ -1,12 +1,19 @@
-import { Piece, PieceConfig, PieceInteractionConfig } from "../types";
+import { PieceConfig, PieceInteractionConfig } from "../types";
 import IMAGE_PATH from "../svg-assets/mom.svg";
+import { Music, PieceId } from "./constant";
 
-const INT_LEARN_SIGN_LANGUAGE_0: Piece.InteractionId =
-  "interaction-learn-sign-language-lesson-0";
+enum SignLanguage {
+  One = "interaction-learn-sign-language-lesson-0",
+}
+
+enum MomTalk {
+  FirstWords = "interaction-first-words",
+  AboutDad = "interaction-about-dad",
+}
 
 const INTERACTIONS: PieceInteractionConfig[] = [
   {
-    id: "interaction-first-words",
+    id: MomTalk.FirstWords,
     name: "Mama",
     flavor_text: "Baby's first words",
     cost: {
@@ -15,18 +22,17 @@ const INTERACTIONS: PieceInteractionConfig[] = [
     gives: {
       language: 1,
     },
-    unlocked: true,
-    unlocks: [
-      {
-        type: "interaction",
-        id: INT_LEARN_SIGN_LANGUAGE_0,
-        owner: "piece-mom",
-      },
-    ],
+    requirements: [],
+    // unlocks: [
+    //   {
+    //     type: "interaction",
+    //     id: SignLanguage.One,
+    //     owner: PieceId.Mom,
+    //   },
+    // ],
   },
-
   {
-    id: INT_LEARN_SIGN_LANGUAGE_0,
+    id: SignLanguage.One,
     name: "Sign Language",
     flavor_text: 'Learn basic signs for like "feed me" or whatever',
     cost: {
@@ -35,6 +41,20 @@ const INTERACTIONS: PieceInteractionConfig[] = [
     gives: {
       language: 1,
     },
+    requirements: [],
+  },
+  {
+    id: Music.FirstPianoTune,
+    name: "Piano Song for Babies",
+    flavor_text:
+      "Moms who can play the piano can easily play piano songs for babies.",
+    cost: {
+      language: 250,
+    },
+    gives: {
+      music: 1,
+    },
+    requirements: [],
   },
   {
     id: "interaction-first-story",
@@ -46,11 +66,17 @@ const INTERACTIONS: PieceInteractionConfig[] = [
     gives: {
       language: 1,
     },
+    requirements: [
+      {
+        owner: PieceId.Mom,
+        id: MomTalk.AboutDad,
+      },
+    ],
   },
 ];
 
 const CONFIG: PieceConfig = {
-  id: "piece-mom",
+  id: PieceId.Mom,
   name: "Mom",
   description: "The automaton's mother",
   gives: {

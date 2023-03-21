@@ -55,7 +55,8 @@ export function piecesNeighbors(piece: Piece.T, board: T) {
 /**
  * Everything within `dist` except `piece` itself
  */
-export function neighbors(dist: number, piece: Piece.T, board: T) {
+export function neighbors(dist: number, pieceId: Piece.Id, board: T) {
+  const piece = board.pieces[pieceId];
   const hex = board.grid[piece.hex_id];
   const pieces = Object.values(board.pieces);
   return range(1, dist + 1).flatMap((dist) =>
@@ -155,14 +156,14 @@ export function useSelectedPiece() {
   return useGameState(getSelectedPiece);
 }
 
-export function usePieceGives(pieceId: "" | Piece.Id) {
-  return useGameState(
-    useCallback(
-      (state) => (pieceId ? State.pieceGives(pieceId, state) : null),
-      [pieceId]
-    )
-  );
-}
+// export function usePieceGives(pieceId: "" | Piece.Id) {
+//   return useGameState(
+//     useCallback(
+//       (state) => (pieceId ? State.pieceGives(pieceId, state) : null),
+//       [pieceId]
+//     )
+//   );
+// }
 
 export function useBoard() {
   const { setState } = useContext(StateContext);
@@ -275,21 +276,21 @@ export function usePieceConnection(pieceId: Piece.Id) {
   };
 }
 
-function toConnection(state: Pick<State.T, "board">) {
-  return State.neighborsGivesLanguage({ board: state.board }).map((piece) =>
-    toPiece(piece.id, state)
-  );
-}
+// function toConnection(state: Pick<State.T, "board">) {
+//   return State.neighborsGivesLanguage({ board: state.board }).map((piece) =>
+//     toPiece(piece.id, state)
+//   );
+// }
 
-export function useConnections() {
-  const languageConnections = useGameState(toConnection);
-  return useMemo(
-    () => ({
-      language: languageConnections,
-    }),
-    [languageConnections]
-  );
-}
+// export function useConnections() {
+//   const languageConnections = useGameState(toConnection);
+//   return useMemo(
+//     () => ({
+//       language: languageConnections,
+//     }),
+//     [languageConnections]
+//   );
+// }
 
 export function useBoardPiece(pieceId: Piece.Id) {
   const { board } = useBoard();

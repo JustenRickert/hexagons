@@ -50,8 +50,13 @@ export function range(from: number, to: number) {
 
 export const keys: <O extends {}>(o: O) => (keyof O)[] = Object.keys;
 
-export const entries: <K extends string, T>(o: Record<K, T>) => [K, T][] =
-  Object.entries;
+export const entries: <K extends string, T>(
+  o: Record<K, T> | Partial<Record<K, T>>
+) => [K, T][] = Object.entries;
+
+// export const partialEntries: <K extends string, T>(
+//   o: Partial<Record<K, T>>
+// ) => [K, T][] = Object.entries;
 
 export function thru<T>(t: T, ...xfs: ((t: T) => T)[]) {
   return xfs.reduce((t, xf) => xf(t), t);
